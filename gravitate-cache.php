@@ -22,11 +22,11 @@ add_action('admin_menu', array( 'GRAVITATE_CACHE_INIT', 'admin_menu' ));
 add_action('save_post', array( 'GRAVITATE_CACHE_INIT', 'save_post' ));
 add_action('updated_option', array( 'GRAVITATE_CACHE_INIT', 'updated_option' ));
 add_action('wp_ajax_gravitate_clear_cache', array( 'GRAVITATE_CACHE_INIT', 'ajax_clear_cache' ));
-add_action( 'admin_bar_menu', array( 'GRAVITATE_CACHE_INIT', 'admin_bar_menu' ), 999);
+add_action('admin_bar_menu', array( 'GRAVITATE_CACHE_INIT', 'admin_bar_menu' ), 999);
 
-if(!empty($grav_cache))
+if(!empty($gravitate_cache_class))
 {
-	add_action('init', array( $grav_cache, 'start_cache' ));
+	add_action('init', array( $gravitate_cache_class, 'start_cache' ));
 }
 
 
@@ -45,9 +45,7 @@ class GRAVITATE_CACHE_INIT {
 			{
 				if($advanced_cache = file_get_contents(dirname(__FILE__).'/templates/advanced-cache.php'))
 				{
-					$fp = fopen(WP_CONTENT_DIR.'/advanced-cache.php', 'w');
-					fwrite($fp, $advanced_cache);
-					fclose($fp);
+					file_put_contents(WP_CONTENT_DIR.'/advanced-cache.php', $advanced_cache);
 				}
 			}
 
@@ -62,7 +60,8 @@ class GRAVITATE_CACHE_INIT {
 					$config_data = preg_replace(
 		            '~<\?(php)?~',
 		            "\\0\r\n" . "/** Enable Page Cache */\r\n" .
-            "define('WP_CACHE', true); // Added by Gravitate Cache\r\n",
+            "define('WP_CACHE', true); // Added by Gravitate Cache\r\n" .
+            "define('GRAVITATE_CACHE_TIMESTART', microtime(true)); // Added by Gravitate Cache\r\n",
 		            $config_data,
 		            1);
 
@@ -75,31 +74,33 @@ class GRAVITATE_CACHE_INIT {
 			{
 				if($gravitate_cache_config = file_get_contents(dirname(__FILE__).'/templates/gravitate-cache-config.php'))
 				{
-					$fp = fopen(WP_CONTENT_DIR.'/gravitate-cache-config.php', 'w');
-					fwrite($fp, $gravitate_cache_config);
-					fclose($fp);
+					file_put_contents(WP_CONTENT_DIR.'/gravitate-cache-config.php', $gravitate_cache_config);
 				}
 			}
 
-			self::clear_cache('.cache');
+			self::clear_all_cache();
 		}
 	}
 
 	static function deactivate()
 	{
-		self::clear_cache('.cache');
+		self::clear_all_cache();
 	}
 
 	static function save_post()
 	{
-		self::clear_cache('.cache');
+		self::clear_all_cache();
+		self::pre_load_pages();
+		file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Post Saved\n\r", FILE_APPEND);
 	}
 
 	static function ajax_clear_cache()
 	{
 		if(is_user_logged_in() && current_user_can('manage_options'))
 		{
-			self::clear_cache('.cache');
+			self::clear_all_cache();
+			self::pre_load_pages();
+			file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Forced Clear \n\r", FILE_APPEND);
 			echo 'Cached has been Cleared Successfully!';
 		}
 		else
@@ -120,8 +121,16 @@ class GRAVITATE_CACHE_INIT {
 
 		if(in_array($option, $clear_options))
 		{
-			self::clear_cache('.cache');
+			self::clear_all_cache();
+			self::pre_load_pages();
+			file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Updated Option \n\r", FILE_APPEND);
 		}
+	}
+
+	static function clear_all_cache()
+	{
+		self::clear_cache('.cache');
+		file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - ALL \n\r", FILE_APPEND);
 	}
 
 	private static function clear_cache($group='')
@@ -134,10 +143,10 @@ class GRAVITATE_CACHE_INIT {
 				{
 					unlink($file);
 				}
+
+
 			}
 		}
-
-		self::pre_load_pages();
 	}
 
 	private static function pre_load_pages()
@@ -327,6 +336,7 @@ class GRAVITATE_CACHE_INIT {
 							if(fwrite($fp, $gravitate_cache_config_str))
 							{
 								$success = 'Settings Saved Successfully';
+								self::pre_load_pages();
 							}
 							else
 							{
