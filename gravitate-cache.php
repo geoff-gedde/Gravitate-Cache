@@ -49,6 +49,15 @@ class GRAVITATE_CACHE_INIT {
 				}
 			}
 
+			// Create DB Cache Dropin
+			if(!file_exists(WP_CONTENT_DIR.'/db.php'))
+			{
+				if($advanced_cache = file_get_contents(dirname(__FILE__).'/templates/db.php'))
+				{
+					file_put_contents(WP_CONTENT_DIR.'/db.php', $advanced_cache);
+				}
+			}
+
 			// Add WP_CACHE
 			$config_file = ABSPATH.'wp-config.php';
 			if((!defined('WP_CACHE') || !WP_CACHE) && file_exists($config_file))
