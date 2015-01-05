@@ -195,7 +195,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 		if(class_exists('GRAVITATE_CACHE_INIT') && !$this->gravitate_is_query_ignored($query) && $results && preg_match( '/^\s*(create|alter|truncate|drop|insert|delete|update|replace)\s/i', $query))
 		{
 			GRAVITATE_CACHE_INIT::clear_all_cache();
-			file_put_contents(dirname(__FILE__).'/data-grav.txt', date("dS g:i:sa").' - '.$query."\n\r", FILE_APPEND);
+			//file_put_contents(dirname(__FILE__).'/data-grav.txt', date("dS g:i:sa").' - SQL: '.$query."\n\r", FILE_APPEND);
 		}
 
 		return $results;

@@ -48,22 +48,22 @@ class GRAVITATE_CACHE_INIT {
 		if(defined('WP_CONTENT_DIR'))
 		{
 			// Create Advanced Cache Dropin
-			if(!file_exists(WP_CONTENT_DIR.'/advanced-cache.php'))
-			{
+			//if(!file_exists(WP_CONTENT_DIR.'/advanced-cache.php'))
+			//{
 				if($advanced_cache = file_get_contents(dirname(__FILE__).'/templates/advanced-cache.php'))
 				{
 					file_put_contents(WP_CONTENT_DIR.'/advanced-cache.php', $advanced_cache);
 				}
-			}
+			//}
 
 			// Create DB Cache Dropin
-			if(!file_exists(WP_CONTENT_DIR.'/db.php'))
-			{
+			//if(!file_exists(WP_CONTENT_DIR.'/db.php'))
+			//{
 				if($advanced_cache = file_get_contents(dirname(__FILE__).'/templates/db.php'))
 				{
 					file_put_contents(WP_CONTENT_DIR.'/db.php', $advanced_cache);
 				}
-			}
+			//}
 
 			// Add WP_CACHE
 			$config_file = ABSPATH.'wp-config.php';
@@ -71,7 +71,15 @@ class GRAVITATE_CACHE_INIT {
 			{
 				$config_data = file_get_contents($config_file);
 
-				if($config_data)
+				if($config_data && strpos($config_data, "define('WP_CACHE',"))
+				{
+					$config_data = str_replace("define('WP_CACHE', false);", "define('WP_CACHE', true);", $config_data);
+					$config_data = str_replace("define('WP_CACHE',false);", "define('WP_CACHE', true);", $config_data);
+					$config_data = str_replace("define('WP_CACHE', FALSE);", "define('WP_CACHE', true);", $config_data);
+					$config_data = str_replace("define('WP_CACHE',FALSE);", "define('WP_CACHE', true);", $config_data);
+					file_put_contents($config_file, $config_data);
+				}
+				else if($config_data && !strpos($config_data, 'GRAVITATE_CACHE_TIMESTART'))
 				{
 					$config_data = preg_replace(
 		            '~<\?(php)?~',
@@ -101,6 +109,41 @@ class GRAVITATE_CACHE_INIT {
 	static function deactivate()
 	{
 		self::clear_all_cache();
+
+		if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/advanced-cache.php'))
+		{
+			$contents = file_get_contents(WP_CONTENT_DIR.'/advanced-cache.php');
+			if(strpos($contents, 'Created by Gravitate Cache Plugin'))
+			{
+				unlink(WP_CONTENT_DIR.'/advanced-cache.php');
+			}
+		}
+
+		if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/db.php'))
+		{
+			$contents = file_get_contents(WP_CONTENT_DIR.'/db.php');
+			if(strpos($contents, 'Created by Gravitate Cache Plugin'))
+			{
+				unlink(WP_CONTENT_DIR.'/db.php');
+			}
+		}
+
+		$config_file = ABSPATH.'wp-config.php';
+		if(defined('WP_CACHE') && WP_CACHE && file_exists($config_file))
+		{
+			$config_data = file_get_contents($config_file);
+
+			if($config_data && strpos($config_data, "define('WP_CACHE'"))
+			{
+				$config_data = str_replace("define('WP_CACHE', true);", "define('WP_CACHE', false);", $config_data);
+				$config_data = str_replace("define('WP_CACHE',true);", "define('WP_CACHE', false);", $config_data);
+				$config_data = str_replace("define('WP_CACHE', TRUE);", "define('WP_CACHE', false);", $config_data);
+				$config_data = str_replace("define('WP_CACHE',TRUE);", "define('WP_CACHE', false);", $config_data);
+				file_put_contents($config_file, $config_data);
+			}
+		}
+
+		define('WP_CACHE', true);
 	}
 
 	static function save_post()
