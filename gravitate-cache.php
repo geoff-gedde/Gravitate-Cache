@@ -8,13 +8,11 @@ Author: Gravitate
 
 */
 
-
 // Make sure we don't expose any info if called directly
 if ( !function_exists( 'add_action' ) ) {
 	echo 'Gravitate Cache.';
 	exit;
 }
-
 
 register_activation_hook( __FILE__, array( 'GRAVITATE_CACHE_INIT', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'GRAVITATE_CACHE_INIT', 'deactivate' ) );
@@ -29,15 +27,24 @@ if(!empty($gravitate_cache_class))
 	add_action('init', array( $gravitate_cache_class, 'start_cache' ));
 }
 
-
-
-
 class GRAVITATE_CACHE_INIT {
 
 	static $version = '0.9.0';
 
 	static function activate()
 	{
+		if(is_plugin_active('w3-total-cache/w3-total-cache.php'))
+		{
+			trigger_error('You Must Deactivate W3TC Plugin as it will conflict with Gravitate Cache.', E_USER_ERROR);
+			return false;
+		}
+
+		if(is_plugin_active('wp-super-cache/wp-cache.php'))
+		{
+			trigger_error('You Must Deactivate WP Super Cache Plugin as it will conflict with Gravitate Cache.', E_USER_ERROR);
+			return false;
+		}
+
 		if(defined('WP_CONTENT_DIR'))
 		{
 			// Create Advanced Cache Dropin
@@ -158,47 +165,74 @@ class GRAVITATE_CACHE_INIT {
 		}
 	}
 
-	private static function pre_load_pages()
+	static function get_config()
 	{
+		$gravitate_cache_config = false;
 
 		if(file_exists(WP_CONTENT_DIR.'/gravitate-cache-config.php'))
 		{
 			include(WP_CONTENT_DIR.'/gravitate-cache-config.php');
+
+			if(!empty($gravitate_cache_config))
+			{
+				foreach ($gravitate_cache_config as $key => $value)
+				{
+					$def = str_replace('-', '_', strtoupper('GRAVITATE_CACHE_CONFIG_'.$key));
+					if(defined($def))
+					{
+						$gravitate_cache_config[$key] = constant($def);
+					}
+				}
+			}
 		}
 
-		if(!empty($gravitate_cache_config['preload_urls']) && $gravitate_cache_config['preload_urls'] != 'none')
+		return $gravitate_cache_config;
+	}
+
+	private static function pre_load_pages()
+	{
+		$config = self::get_config();
+
+		if(!empty($config['preload_urls']) && $config['preload_urls'] != 'none')
 		{
 			// Preload Menu Links
-			if($gravitate_cache_config['preload_urls'] == 'menus')
+			if($config['preload_urls'] == 'menus')
 			{
 				if($menus = get_registered_nav_menus())
 				{
 					foreach ($menus as $menu => $title)
 					{
 						$locations = get_nav_menu_locations();
-						$menu = wp_get_nav_menu_object( $locations[ $menu ] );
-						$items = wp_get_nav_menu_items( $menu->term_id );
 
-						if(!empty($items))
+						if(isset($locations[ $menu ]))
 						{
-							foreach ($items as $item)
+							if(!empty($menu->termd_id))
 							{
-								if(strpos($item->url, site_url()) !== false)
+								$menu = wp_get_nav_menu_object( $locations[ $menu ] );
+								$items = wp_get_nav_menu_items( $menu->term_id );
+
+								if(!empty($items))
 								{
-									self::pre_load_page($item->url);
+									foreach ($items as $item)
+									{
+										if(strpos($item->url, site_url()) !== false)
+										{
+											self::pre_load_page($item->url);
+										}
+									}
 								}
-							}
-						}
-						else
-						{
-							$menu = wp_page_menu( array('echo' => false) );
-							preg_match_all('/href\=\"([^"]*)\"/s', $menu, $matches);
-
-							if(!empty($matches[1]))
-							{
-								foreach ($matches[1] as $url)
+								else
 								{
-									self::pre_load_page($url);
+									$menu = wp_page_menu( array('echo' => false) );
+									preg_match_all('/href\=\"([^"]*)\"/s', $menu, $matches);
+
+									if(!empty($matches[1]))
+									{
+										foreach ($matches[1] as $url)
+										{
+											self::pre_load_page($url);
+										}
+									}
 								}
 							}
 						}
@@ -207,7 +241,7 @@ class GRAVITATE_CACHE_INIT {
 			}
 
 			// Preload All Pages
-			if($gravitate_cache_config['preload_urls'] == 'pages')
+			if($config['preload_urls'] == 'pages')
 			{
 				if($pages = get_pages())
 				{
@@ -262,6 +296,7 @@ class GRAVITATE_CACHE_INIT {
 		if(is_user_logged_in() && current_user_can('manage_options'))
 		{
 			$args = array(
+				'id' => 'gravitate_cache_clear',
 				'parent'    => 'gravitate_cache',
 				'title' => 'Clear All Cache',
 				'href' => '#',
@@ -275,21 +310,19 @@ class GRAVITATE_CACHE_INIT {
 	{
 		if(!empty($_GET['page']) && $_GET['page'] == 'gravitate_cache_settings')
 		{
-			if(file_exists(WP_CONTENT_DIR.'/gravitate-cache-config.php'))
-			{
-				include(WP_CONTENT_DIR.'/gravitate-cache-config.php');
-			}
+			$config = self::get_config();
 
-			if(empty($gravitate_cache_config))
+			if(empty($config))
 			{
 				$error = 'Missing Config File';
 			}
 
 			if(defined('GRAVITATE_CACHE_LOCK_SETTINGS') && GRAVITATE_CACHE_LOCK_SETTINGS == true)
 			{
-				$error = 'The Settings have been locked.  Please see your Web Developer.  This is most likely intensional as the don\'t want you to mess with the settings :)';
+				$error = 'The Settings have been locked.  Please see your Web Developer.  This is most likely intensional as they don\'t want you to mess with the settings :)';
 			}
 
+			// Check for Error
 			if(!empty($error))
 			{
 				?>
@@ -302,47 +335,48 @@ class GRAVITATE_CACHE_INIT {
 			}
 			else
 			{
+				// Save Config
 				if(!empty($_POST['save_settings']) && !empty($_POST['config']))
 				{
-					if($gravitate_cache_config_str = file_get_contents(dirname(__FILE__).'/templates/gravitate-cache-config.php'))
+					if($config_str = file_get_contents(dirname(__FILE__).'/templates/gravitate-cache-config.php'))
 					{
 
-						$gravitate_cache_config_str = str_replace("false,/*page_enabled*/", (!empty($_POST['config']['page_enabled']) ? 'true,' : 'false,'), $gravitate_cache_config_str);
-						$gravitate_cache_config['page_enabled'] = (!empty($_POST['config']['page_enabled']) ? true : false);
+						$config_str = str_replace("false,/*page_enabled*/", (!empty($_POST['config']['page_enabled']) ? 'true,' : 'false,'), $config_str);
+						$config['page_enabled'] = (!empty($_POST['config']['page_enabled']) ? true : false);
 
-						$gravitate_cache_config_str = str_replace("false,/*database_enabled*/", (!empty($_POST['config']['database_enabled']) ? 'true,' : 'false,'), $gravitate_cache_config_str);
-						$gravitate_cache_config['database_enabled'] = (!empty($_POST['config']['database_enabled']) ? true : false);
+						$config_str = str_replace("false,/*database_enabled*/", (!empty($_POST['config']['database_enabled']) ? 'true,' : 'false,'), $config_str);
+						$config['database_enabled'] = (!empty($_POST['config']['database_enabled']) ? true : false);
 
-						$gravitate_cache_config_str = str_replace("false,/*object_enabled*/", (!empty($_POST['config']['object_enabled']) ? 'true,' : 'false,'), $gravitate_cache_config_str);
-						$gravitate_cache_config['object_enabled'] = (!empty($_POST['config']['object_enabled']) ? true : false);
+						$config_str = str_replace("false,/*object_enabled*/", (!empty($_POST['config']['object_enabled']) ? 'true,' : 'false,'), $config_str);
+						$config['object_enabled'] = (!empty($_POST['config']['object_enabled']) ? true : false);
 
 						if(!empty($_POST['config']['type']))
 						{
-							$gravitate_cache_config_str = str_replace("'disk'", "'".sanitize_key($_POST['config']['type'])."'", $gravitate_cache_config_str);
-							$gravitate_cache_config['type'] = $_POST['config']['type'];
+							$config_str = str_replace("'disk'", "'".sanitize_key($_POST['config']['type'])."'", $config_str);
+							$config['type'] = $_POST['config']['type'];
 						}
 
 						if(!empty($_POST['config']['server']))
 						{
-							$gravitate_cache_config_str = str_replace("'127.0.0.1:11211'", "'".str_replace(array("'",'"',' '), '', $_POST['config']['server'])."'", $gravitate_cache_config_str);
-							$gravitate_cache_config['server'] = str_replace(' ', '', $_POST['config']['server']);
+							$config_str = str_replace("'127.0.0.1:11211'", "'".str_replace(array("'",'"',' '), '', $_POST['config']['server'])."'", $config_str);
+							$config['server'] = str_replace(' ', '', $_POST['config']['server']);
 						}
 
 						if(!empty($_POST['config']['excluded_urls']))
 						{
-							$gravitate_cache_config_str = str_replace("array('wp-.*\\\\.php')", "array('".implode("','", explode("\n", str_replace(array("'",'"',' ',"\r"), array('','','',''), trim($_POST['config']['excluded_urls']))))."')", $gravitate_cache_config_str);
-							$gravitate_cache_config['excluded_urls'] = explode("\n", str_replace(array("'",'"',' ',"\r"), '', trim($_POST['config']['excluded_urls'])));
+							$config_str = str_replace("'wp-.*\\\\.php'", "'".implode(",", explode("\n", str_replace(array("'",'"',' ',"\r"), array('','','',''), trim($_POST['config']['excluded_urls']))))."'", $config_str);
+							$config['excluded_urls'] = str_replace(array("'",'"',' ',"\r"), '', trim($_POST['config']['excluded_urls']));
 						}
 
 						if(!empty($_POST['config']['preload_urls']))
 						{
-							$gravitate_cache_config_str = str_replace("'menus'", "'".sanitize_key($_POST['config']['preload_urls'])."'", $gravitate_cache_config_str);
-							$gravitate_cache_config['preload_urls'] = $_POST['config']['preload_urls'];
+							$config_str = str_replace("'menus'", "'".sanitize_key($_POST['config']['preload_urls'])."'", $config_str);
+							$config['preload_urls'] = $_POST['config']['preload_urls'];
 						}
 
 						if($fp = fopen(WP_CONTENT_DIR.'/gravitate-cache-config.php', 'w'))
 						{
-							if(fwrite($fp, $gravitate_cache_config_str))
+							if(fwrite($fp, $config_str))
 							{
 								$success = 'Settings Saved Successfully';
 								self::pre_load_pages();
@@ -359,6 +393,8 @@ class GRAVITATE_CACHE_INIT {
 						}
 					}
 				}
+
+				// If No Error then Show Form
 				?>
 					<div class="wrap">
 						<h2>Gravitate Cache Settings</h2>
@@ -374,18 +410,18 @@ class GRAVITATE_CACHE_INIT {
 						<form method="post">
 							<input type="hidden" name="save_settings" value="1">
 							<div>
-								<label for="page_enabled"><input id="page_enabled" type="checkbox" name="config[page_enabled]" value="1" <?php checked($gravitate_cache_config['page_enabled'], true);?>> &nbsp; <strong>Enable Page Cache</strong></label><br>
-								<label for="database_enabled"><input id="database_enabled" type="checkbox" name="config[database_enabled]" value="1" <?php checked($gravitate_cache_config['database_enabled'], true);?>> &nbsp; <strong>Enable Database Cache</strong></label><br>
-								<label for="object_enabled"><input id="object_enabled" type="checkbox" name="config[object_enabled]" value="1" <?php checked($gravitate_cache_config['object_enabled'], true);?>> &nbsp; <strong>Enable Object Cache</strong></label><br><br><br>
+								<label for="page_enabled"><input id="page_enabled" type="checkbox" name="config[page_enabled]" value="1" <?php checked($config['page_enabled'], true);?> <?php disabled( defined('GRAVITATE_CACHE_CONFIG_PAGE_ENABLED'), true ); ?>> &nbsp; <strong>Enable Page Cache</strong></label><br>
+								<label for="database_enabled"><input id="database_enabled" type="checkbox" name="config[database_enabled]" value="1" <?php checked($config['database_enabled'], true);?><?php disabled( defined('GRAVITATE_CACHE_CONFIG_DATABASE_ENABLED'), true ); ?>> &nbsp; <strong>Enable Database Cache</strong></label><br>
+								<label for="object_enabled"><input id="object_enabled" type="checkbox" name="config[object_enabled]" value="1" <?php checked($config['object_enabled'], true);?><?php disabled( defined('GRAVITATE_CACHE_CONFIG_OBJECT_ENABLED'), true ); ?>> &nbsp; <strong>Enable Object Cache</strong></label><br><br><br>
 							</div>
 							<div>
 								<label for="type"><strong>Caching Type</strong></label>
 								<br>
-								<select id="type" name="config[type]">
-									<option value="auto" <?php selected($gravitate_cache_config['type'], 'auto');?>>Auto Detect the best Method</option>
-									<option value="disk" <?php selected($gravitate_cache_config['type'], 'disk');?>>Disk (Simple and works on most Servers)</option>
-									<option value="memcache" <?php selected($gravitate_cache_config['type'], 'memcache');?>>Memcache (Faster and more Secure)</option>
-									<option value="memcached" <?php selected($gravitate_cache_config['type'], 'memcached');?>>MemcacheD (Faster and more Secure)</option>
+								<select id="type" name="config[type]" <?php disabled( defined('GRAVITATE_CACHE_CONFIG_TYPE'), true ); ?>>
+									<option value="auto" <?php selected($config['type'], 'auto');?>>Auto Detect the best Method</option>
+									<option value="disk" <?php selected($config['type'], 'disk');?>>Disk (Simple and works on most Servers)</option>
+									<option value="memcache" <?php selected($config['type'], 'memcache');?>>Memcache (Faster and more Secure)</option>
+									<option value="memcached" <?php selected($config['type'], 'memcached');?>>MemcacheD (Faster and more Secure)</option>
 								</select>
 								<br>
 								<br>
@@ -393,24 +429,24 @@ class GRAVITATE_CACHE_INIT {
 							<div>
 								<label for="server"><strong>Memcache/MemcacheD Server IP and Port</strong></label>
 								<br>
-								<input style="width: 180px;" type="text" value="<?php echo (!empty($gravitate_cache_config['server']) ? $gravitate_cache_config['server'] : '127.0.0.1:11211');?>" id="server" name="config[server]"> default is 127.0.0.1:11211
+								<input style="width: 180px;" type="text" value="<?php echo (!empty($config['server']) ? $config['server'] : '127.0.0.1:11211');?>" id="server" name="config[server]" <?php disabled( defined('GRAVITATE_CACHE_CONFIG_SERVER'), true ); ?>> default is 127.0.0.1:11211
 								<br>
 								<br>
 							</div>
 							<div>
 								<label for="type"><strong>Page Caching - Excluded Urls (Regex)</strong></label>
 								<br>
-								<textarea id="type" name="config[excluded_urls]" rows="5" cols="40"><?php echo str_replace('\\\\', '\\', (implode("\n", $gravitate_cache_config['excluded_urls'])));?></textarea>
+								<textarea id="type" name="config[excluded_urls]" rows="5" cols="40" <?php disabled( defined('GRAVITATE_CACHE_CONFIG_EXCLUDED_URLS'), true ); ?>><?php echo str_replace('\\\\', '\\', (implode("\n", explode(',', $config['excluded_urls']))));?></textarea>
 								<br>
 								<br>
 							</div>
 							<div>
 								<label for="type"><strong>Page Caching - Preload Urls when cache is cleared.</strong></label>
 								<br>
-								<select id="type" name="config[preload_urls]">
-									<option value="none" <?php selected($gravitate_cache_config['preload_urls'], 'none');?>>No, Do Not Preload Pages.</option>
-									<option value="menus" <?php selected($gravitate_cache_config['preload_urls'], 'menus');?>>Only Items listed in the Menus. (Recommended)</option>
-									<option value="pages" <?php selected($gravitate_cache_config['preload_urls'], 'pages');?>>All Pages. (This does not include Posts or custom post types)</option>
+								<select id="type" name="config[preload_urls]" <?php disabled( defined('GRAVITATE_CACHE_CONFIG_PRELOAD_URLS'), true ); ?>>
+									<option value="none" <?php selected($config['preload_urls'], 'none');?>>No, Do Not Preload Pages.</option>
+									<option value="menus" <?php selected($config['preload_urls'], 'menus');?>>Only Items listed in the Menus. (Recommended)</option>
+									<option value="pages" <?php selected($config['preload_urls'], 'pages');?>>All Pages. (This does not include Posts or custom post types)</option>
 								</select>
 								<br>
 								<br>

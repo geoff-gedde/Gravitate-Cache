@@ -12,17 +12,39 @@ class GRAVITATE_CACHE {
 	{
 		if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/gravitate-cache-config.php'))
 		{
+			$gravitate_cache_config = false;
+
 			include(WP_CONTENT_DIR.'/gravitate-cache-config.php');
+
+			if(!empty($gravitate_cache_config))
+			{
+				foreach ($gravitate_cache_config as $key => $value)
+				{
+					$def = str_replace('-', '_', strtoupper('GRAVITATE_CACHE_CONFIG_'.$key));
+					if(defined($def))
+					{
+						$gravitate_cache_config[$key] = constant($def);
+					}
+				}
+			}
 
 			if(!empty($gravitate_cache_config))
 			{
 				$this->config = $gravitate_cache_config;
 			}
-		}
 
+			if(defined('GRAVITATE_CACHE_DEBUG') && GRAVITATE_CACHE_DEBUG)
+			{
+				$this->debug = true;
+			}
+		}
+	}
+
+	public function init_page_cache()
+	{
 		if(!empty($this->config['page_enabled']) && $this->can_cache())
 		{
-			if($cache = $this->get_cache($_SERVER['REQUEST_URI']))
+			if($cache = $this->get($_SERVER['REQUEST_URI']))
 			{
 				echo $cache."\n<!-- Gravitate Cache - Served from Page Cache -->";
 				$this->shutdown();
@@ -80,7 +102,7 @@ class GRAVITATE_CACHE {
 		if($this->can_cache())
 		{
 			// $buffer
-			$this->set_cache($_SERVER['REQUEST_URI'], $buffer, 300);
+			$this->set($_SERVER['REQUEST_URI'], $buffer, 300);
 		}
 
 		return $buffer.$this->shutdown();
@@ -114,13 +136,13 @@ class GRAVITATE_CACHE {
 		{
 			if(defined('GRAVITATE_CACHE_TIMESTART') && GRAVITATE_CACHE_TIMESTART)
 			{
-				$output.= "\n<!-- Gravitate Cache - Execution Time - ".sprintf("%01.6f", (microtime(true)-GRAVITATE_CACHE_TIMESTART))." -->";
+				$output.= "\n<!-- Gravitate Cache - DEBUG: Execution Time - ".sprintf("%01.6f", (microtime(true)-GRAVITATE_CACHE_TIMESTART))." -->";
 			}
 
 			if(!empty($this->config['database_enabled']) && method_exists($wpdb,'get_gravitate_cached_items'))
 			{
 
-				$output.= "\n<!-- Gravitate Cache - Database Debug \n#########################\nQUERIES FROM CACHE\n#########################\n";
+				$output.= "\n<!-- Gravitate Cache - DEBUG: Database \n#########################\nQUERIES FROM CACHE\n#########################\n";
 				foreach($wpdb->get_gravitate_cached_items() as $key => $item)
 				{
 					$output.= $key.') '.$item."\n";
@@ -132,11 +154,11 @@ class GRAVITATE_CACHE {
 					$output.= $key.') '.$item."\n";
 				}
 
-				$output.= "\n#########################\nFIRED QUERIES\n#########################\n";
-				foreach($wpdb->get_gravitate_fired_items() as $key => $item)
-				{
-					$output.= $key.') '.$item."\n";
-				}
+				// $output.= "\n#########################\nFIRED QUERIES\n#########################\n";
+				// foreach($wpdb->get_gravitate_fired_items() as $key => $item)
+				// {
+				// 	$output.= $key.') '.$item."\n";
+				// }
 
 				$output.= "\n -->";
 			}
@@ -195,7 +217,7 @@ class GRAVITATE_CACHE {
 
 		if(!empty($this->config['excluded_urls']))
 		{
-			foreach ($this->config['excluded_urls'] as $url)
+			foreach (array_map('trim', explode(',', $this->config['excluded_urls'])) as $url)
 			{
 				if(!empty($url))
 				{
@@ -235,9 +257,9 @@ class GRAVITATE_CACHE {
 		return false;
 	}
 
-	public function get_cache($key='', $group='')
+	public function get($key='', $group='')
 	{
-		$value = false;
+		$value = '';
 
 		if(!empty($key))
 		{
@@ -265,16 +287,18 @@ class GRAVITATE_CACHE {
 				{
 					$this->mcache = new Memcached();
 					$this->mcache->addServer($server[0], $server[1]);
+					$value = $this->mcache->get($key);
 				}
 				else if(class_exists('Memcache'))
 				{
 					$this->mcache = new Memcache;
 					$this->mcache->addServer($server[0], $server[1]);
+					$value = $this->mcache->get($key);
 				}
 			}
 		}
 
-		if($value && function_exists("base64_decode"))
+		if($value !== '' && function_exists("base64_decode"))
 		{
 			$value = base64_decode($value);
 		}
@@ -297,7 +321,7 @@ class GRAVITATE_CACHE {
 		return $value;
 	}
 
-	public function set_cache($key='', $value='', $expires=false, $group='')
+	public function set($key='', $value='', $expires=false, $group='')
 	{
 		$key = md5($key);
 
@@ -334,20 +358,24 @@ class GRAVITATE_CACHE {
 
 			if(is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
 			{
-				file_put_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache', $value);
+				return file_put_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache', $value);
 			}
 		}
 		else if($this->config['type'] == 'memcached')
 		{
 			if(class_exists('Memcached'))
 			{
-				$this->mcache->set($key, $value, $expires);
+				return $this->mcache->set($key, $value, $expires);
 			}
 			else if(class_exists('Memcache'))
 			{
-				$this->mcache->set($key, $value, 0, $expires);
+				return $this->mcache->set($key, $value, 0, $expires);
 			}
 		}
+
+		return false;
 	}
 }
+
+
 
