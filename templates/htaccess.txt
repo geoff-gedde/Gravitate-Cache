@@ -1,0 +1,19 @@
+#################################
+### Gravitate Cache/GZip Content
+#################################
+<IfModule mod_expires.c>
+  <FilesMatch "\.(jpg|jpeg|gif|png|ico|mp3|flv|mov|avi|3pg|html|htm|swf|js|css|htc|eot|woff|svg)$">
+       ExpiresActive on
+       ExpiresDefault "access plus 1 month"
+   </FilesMatch>
+</IfModule>
+<FilesMatch "\.(jpg|jpeg|gif|png|ico|mp3|flv|mov|avi|3pg|html|htm|swf|css|js|htc|eot|woff|svg)$">
+    FileETag MTime Size
+    ErrorDocument 404 "404 File Not Found"
+</FilesMatch>
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/htm text/css application/javascript application/x-javascript text/javascript text/plain text/xml
+</IfModule>
+#####################################
+### END Gravitate Cache/GZip Content
+#####################################

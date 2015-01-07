@@ -418,14 +418,18 @@ class GRAVITATE_CACHE_INIT {
 					if($config_str = file_get_contents(dirname(__FILE__).'/templates/gravitate-cache-config.php'))
 					{
 
-						$config_str = str_replace("false,/*page_enabled*/", (!empty($_POST['config']['page_enabled']) ? 'true,' : 'false,'), $config_str);
+						$config_str = str_replace("'page_enabled' => false", (!empty($_POST['config']['page_enabled']) ? "'page_enabled' => true" : "'page_enabled' => false"), $config_str);
 						$config['page_enabled'] = (!empty($_POST['config']['page_enabled']) ? true : false);
 
-						$config_str = str_replace("false,/*database_enabled*/", (!empty($_POST['config']['database_enabled']) ? 'true,' : 'false,'), $config_str);
+						$config_str = str_replace("'database_enabled' => false", (!empty($_POST['config']['database_enabled']) ? "'database_enabled' => true" : "'database_enabled' => false"), $config_str);
 						$config['database_enabled'] = (!empty($_POST['config']['database_enabled']) ? true : false);
 
-						$config_str = str_replace("false,/*object_enabled*/", (!empty($_POST['config']['object_enabled']) ? 'true,' : 'false,'), $config_str);
+						$config_str = str_replace("'object_enabled' => false", (!empty($_POST['config']['object_enabled']) ? "'object_enabled' => true" : "'object_enabled' => false"), $config_str);
 						$config['object_enabled'] = (!empty($_POST['config']['object_enabled']) ? true : false);
+
+						$config_str = str_replace("'browser_enabled' => false", (!empty($_POST['config']['browser_enabled']) ? "'browser_enabled' => true" : "'browser_enabled' => false"), $config_str);
+						$config['browser_enabled'] = (!empty($_POST['config']['browser_enabled']) ? true : false);
+
 
 						if(!empty($_POST['config']['type']))
 						{
@@ -469,6 +473,40 @@ class GRAVITATE_CACHE_INIT {
 							$error = 'There was an error saving the Settings (Cannot access disk). Please try again.';
 						}
 					}
+
+					if($config['browser_enabled'])
+					{
+						$htaccess_file = ABSPATH.'.htaccess';
+						if(file_exists($htaccess_file))
+						{
+							if($contents = file_get_contents($htaccess_file))
+							{
+								$browser_contents = file_get_contents(dirname(__FILE__).'/templates/htaccess.txt');
+								if($browser_contents && !strpos($contents, 'Gravitate Cache/GZip Content'))
+								{
+									if(!file_put_contents($htaccess_file, $browser_contents, FILE_APPEND))
+									{
+										$error = 'There was an error writing to the .htaccess file. Please try again.';
+									}
+								}
+							}
+						}
+					}
+					else
+					{
+						$htaccess_file = ABSPATH.'.htaccess';
+						if(file_exists($htaccess_file))
+						{
+							if($contents = file_get_contents($htaccess_file))
+							{
+								$browser_contents = file_get_contents(dirname(__FILE__).'/templates/htaccess.txt');
+								if($browser_contents && strpos($contents, 'Gravitate Cache/GZip Content'))
+								{
+									file_put_contents($htaccess_file, str_replace($browser_contents, '', $contents));
+								}
+							}
+						}
+					}
 				}
 
 				// If No Error then Show Form
@@ -489,7 +527,8 @@ class GRAVITATE_CACHE_INIT {
 							<div>
 								<label for="page_enabled"><input id="page_enabled" type="checkbox" name="config[page_enabled]" value="1" <?php checked($config['page_enabled'], true);?> <?php disabled( defined('GRAVITATE_CACHE_CONFIG_PAGE_ENABLED'), true ); ?>> &nbsp; <strong>Enable Page Cache</strong></label><br>
 								<label for="database_enabled"><input id="database_enabled" type="checkbox" name="config[database_enabled]" value="1" <?php checked($config['database_enabled'], true);?><?php disabled( defined('GRAVITATE_CACHE_CONFIG_DATABASE_ENABLED'), true ); ?>> &nbsp; <strong>Enable Database Cache</strong></label><br>
-								<label for="object_enabled"><input id="object_enabled" type="checkbox" name="config[object_enabled]" value="1" <?php checked($config['object_enabled'], true);?><?php disabled( defined('GRAVITATE_CACHE_CONFIG_OBJECT_ENABLED'), true ); ?>> &nbsp; <strong>Enable Object Cache</strong></label><br><br><br>
+								<label for="object_enabled"><input id="object_enabled" type="checkbox" name="config[object_enabled]" value="1" <?php checked($config['object_enabled'], true);?><?php disabled( defined('GRAVITATE_CACHE_CONFIG_OBJECT_ENABLED'), true ); ?>> &nbsp; <strong>Enable Object Cache</strong></label><br>
+								<label for="browser_enabled"><input id="browser_enabled" type="checkbox" name="config[browser_enabled]" value="1" <?php checked($config['browser_enabled'], true);?><?php disabled( defined('GRAVITATE_CACHE_CONFIG_BROWSER_ENABLED'), true ); ?>> &nbsp; <strong>Enable Browser Cache</strong></label><br><br><br>
 							</div>
 							<div>
 								<label for="type"><strong>Caching Type</strong></label>
