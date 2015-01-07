@@ -2,18 +2,16 @@
 
 class GRAVITATE_CACHE {
 
-	private $config;
-	private $mcache;
-	private $no_cache_reason = '';
-	private $static_cache = array();
-	private $debug = false;
+	private static $mcache;
+	private static $no_cache_reason = '';
+	private static $static_cache = array();
+	public static $debug = false;
+	public static $config;
 
-	public function __construct()
+	static function init()
 	{
 		if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/gravitate-cache-config.php'))
 		{
-			$gravitate_cache_config = false;
-
 			include(WP_CONTENT_DIR.'/gravitate-cache-config.php');
 
 			if(!empty($gravitate_cache_config))
@@ -26,120 +24,119 @@ class GRAVITATE_CACHE {
 						$gravitate_cache_config[$key] = constant($def);
 					}
 				}
-			}
 
-			if(!empty($gravitate_cache_config))
-			{
-				$this->config = $gravitate_cache_config;
+				self::$config = $gravitate_cache_config;
+				self::set_cache_type();
 			}
+		}
 
-			if(defined('GRAVITATE_CACHE_DEBUG') && GRAVITATE_CACHE_DEBUG)
-			{
-				$this->debug = true;
-			}
+		if(defined('GRAVITATE_CACHE_DEBUG') && GRAVITATE_CACHE_DEBUG)
+		{
+			self::$debug = true;
 		}
 	}
 
-	public function init_page_cache()
+	public static function init_page_cache()
 	{
-		if(!empty($this->config['page_enabled']) && $this->can_cache())
+		if(!empty(self::$config['page_enabled']) && self::can_page_cache())
 		{
-			if($cache = $this->get($_SERVER['REQUEST_URI']))
+			if($cache = self::get($_SERVER['REQUEST_URI']))
 			{
 				echo $cache."\n<!-- Gravitate Cache - Served from Page Cache -->";
-				$this->shutdown();
+				if(!empty(self::$config['database_enabled']))
+				{
+					echo "\n<!-- Gravitate Cache - Database Cache not needed when using Page Cache -->";
+				}
+				self::details();
 				exit;
 			}
 		}
 	}
 
-	private function set_cache_type()
+	private static function set_cache_type()
 	{
-		if($this->config['type'] == 'auto')
+		if(!empty(self::$config['database_enabled']) || !empty(self::$config['page_enabled']) || !empty(self::$config['object_enabled']))
 		{
-			if(class_exists('Memcached'))
+			if(self::$config['type'] == 'auto' || self::$config['type'] == 'memcached')
 			{
-				$this->config['type'] = 'memcached';
-			}
-			else if(class_exists('Memcache'))
-			{
-				$this->config['type'] = 'memcache';
-			}
-			else
-			{
-				$this->config['type'] = 'disk';
-			}
-		}
-	}
-
-	public function ob_end_flush()
-	{
-		ob_end_flush();
-	}
-
-	public function start_cache()
-	{
-		include_once( ABSPATH . 'wp-admin/includes/plugin.php' );
-
-		if(is_plugin_active('gravitate-cache/gravitate-cache.php'))
-		{
-			if($this->can_cache())
-			{
-				ob_start(array($this, 'page_buffer_cache'));
-			}
-			else
-			{
-				if(!defined('DOING_AJAX') || (defined('DOING_AJAX') && !DOING_AJAX))
+				if(class_exists('Memcached'))
 				{
-					add_action('shutdown', array($this, 'shutdown'));
+					$server = explode(':', self::$config['server']);
+					if(!empty($server[0]) && !empty($server[0]))
+					{
+						if(self::$mcache = new Memcached())
+						{
+							if(self::$mcache->addServer($server[0], $server[1]))
+							{
+								self::$config['type'] = 'memcached';
+							}
+						}
+					}
+				}
+			}
+
+			if(self::$config['type'] == 'auto' || self::$config['type'] == 'memcache')
+			{
+				if(class_exists('Memcache'))
+				{
+					if(!empty($server[0]) && !empty($server[0]))
+					{
+						if(self::$mcache = new Memcache)
+						{
+							if(self::$mcache->addServer($server[0], $server[1]))
+							{
+								self::$config['type'] = 'memcache';
+							}
+						}
+					}
 				}
 			}
 		}
-	}
 
-	public function page_buffer_cache($buffer)
-	{
-		if($this->can_cache())
+		// Default to Disk if Memcache is not available
+		if(self::$config['type'] == 'auto')
 		{
-			// $buffer
-			$this->set($_SERVER['REQUEST_URI'], $buffer, 300);
+			self::$config['type'] = 'disk';
 		}
-
-		return $buffer.$this->shutdown();
 	}
 
-	public function shutdown()
+	public static function details()
 	{
 		global $wpdb;
 
 		$output = '';
 
-		if(!$this->can_cache())
+		if(!self::can_page_cache())
 		{
-			if(!empty($this->no_cache_reason))
+			if(!empty(self::$no_cache_reason))
 			{
-				$output.= "\n<!-- Gravitate Cache - Page Not Cached - ".$this->no_cache_reason." -->";
+				$output.= "\n<!-- Gravitate Cache - Page Not Cached - ".self::$no_cache_reason." -->";
 			}
 		}
 
-		if(!empty($this->config['database_enabled']) && method_exists($wpdb,'get_gravitate_cached_items'))
+		if(!empty(self::$config['database_enabled']) && method_exists($wpdb,'get_gravitate_cached_items'))
 		{
 			$output.= "\n<!-- Gravitate Cache - Database Cache Enabled - ".count($wpdb->get_gravitate_cached_items())." Querie(s) pulled from cache. ".count($wpdb->get_gravitate_raw_items())." Raw Querie(s).  -->";
 		}
 
-		if(empty($this->config['database_enabled']))
+		if(empty(self::$config['database_enabled']))
 		{
-			$output.= "\n<!-- Gravitate Cache - Database Cache Disabled";
+			$output.= "\n<!-- Gravitate Cache - Database Cache Disabled -->";
 		}
 
-		if($this->debug)
+		if(self::$debug)
 		{
-			if(defined('GRAVITATE_CACHE_TIMESTART') && GRAVITATE_CACHE_TIMESTART)
+			if(!empty(self::$config['type']))
 			{
-				$output.= "\n<!-- Gravitate Cache - DEBUG: Execution Time - ".sprintf("%01.6f", (microtime(true)-GRAVITATE_CACHE_TIMESTART))." -->";
+				$output.= "\n<!-- Gravitate Cache - DEBUG: Caching Type is (".self::$config['type'].") -->";
 			}
 
-			if(!empty($this->config['database_enabled']) && method_exists($wpdb,'get_gravitate_cached_items'))
+			if(defined('GRAVITATE_CACHE_TIMESTART') && GRAVITATE_CACHE_TIMESTART)
+			{
+				$output.= "\n<!-- Gravitate Cache - DEBUG: Server Execution Time was ".sprintf("%01.6f", (microtime(true)-GRAVITATE_CACHE_TIMESTART))." Seconds -->";
+			}
+
+			if(!empty(self::$config['database_enabled']) && method_exists($wpdb,'get_gravitate_cached_items'))
 			{
 
 				$output.= "\n<!-- Gravitate Cache - DEBUG: Database \n#########################\nQUERIES FROM CACHE\n#########################\n";
@@ -154,12 +151,6 @@ class GRAVITATE_CACHE {
 					$output.= $key.') '.$item."\n";
 				}
 
-				// $output.= "\n#########################\nFIRED QUERIES\n#########################\n";
-				// foreach($wpdb->get_gravitate_fired_items() as $key => $item)
-				// {
-				// 	$output.= $key.') '.$item."\n";
-				// }
-
 				$output.= "\n -->";
 			}
 		}
@@ -169,29 +160,23 @@ class GRAVITATE_CACHE {
 		return $output;
 	}
 
-	private function has_cache()
+	public static function can_page_cache()
 	{
-		// Do Something
-		return false;
-	}
-
-	private function can_cache()
-	{
-		if(empty($this->config['page_enabled']))
+		if(empty(self::$config['page_enabled']))
 		{
-			$this->no_cache_reason = 'Page Cache Disabled';
+			self::$no_cache_reason = 'Page Cache Disabled';
 			return false;
 		}
 
 		if(defined('WP_ADMIN'))
 		{
-			$this->no_cache_reason = 'In Admin Panel';
+			self::$no_cache_reason = 'In Admin Panel';
 			return false;
 		}
 
 		if(!empty($_POST))
 		{
-			$this->no_cache_reason = 'Page has Submited Data';
+			self::$no_cache_reason = 'Page has Submited POST Data';
 			return false;
 		}
 
@@ -199,7 +184,7 @@ class GRAVITATE_CACHE {
 		{
 			if(is_user_logged_in())
 			{
-				$this->no_cache_reason = 'User Logged In';
+				self::$no_cache_reason = 'User Logged In';
 				return false;
 			}
 		}
@@ -209,15 +194,15 @@ class GRAVITATE_CACHE {
 		    {
 		        if(substr($key, 0, 19) === "wordpress_logged_in")
 		        {
-		            $this->no_cache_reason = 'User Logged In';
+		            self::$no_cache_reason = 'User Logged In';
 					return false;
 		        }
 		    }
 		}
 
-		if(!empty($this->config['excluded_urls']))
+		if(!empty(self::$config['excluded_urls']))
 		{
-			foreach (array_map('trim', explode(',', $this->config['excluded_urls'])) as $url)
+			foreach (array_map('trim', explode(',', self::$config['excluded_urls'])) as $url)
 			{
 				if(!empty($url))
 				{
@@ -240,67 +225,95 @@ class GRAVITATE_CACHE {
 
 					if(preg_match('/'.$url.'/', $_SERVER['REQUEST_URI']))
 					{
-						$this->no_cache_reason = 'Excluded URL '.$original_url;
+						self::$no_cache_reason = 'Excluded URL '.$original_url;
 						return false;
 					}
 				}
 			}
 		}
 
-		if(!empty($this->config['page_enabled']) && !defined('WP_ADMIN'))
+		if(!empty(self::$config['page_enabled']) && !defined('WP_ADMIN'))
 		{
-			$this->no_cache_reason = '';
+			self::$no_cache_reason = '';
 			return true;
 		}
 
-		$this->no_cache_reason = 'Unknown';
+		self::$no_cache_reason = 'Unknown';
 		return false;
 	}
 
-	public function get($key='', $group='')
+	public function clear($group='')
+	{
+		if(self::$config['type'] == 'disk')
+		{
+			if(defined('WP_CONTENT_DIR') && is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
+			{
+				$num = 0;
+				foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/*'.$group.'*') as $file)
+				{
+					unlink($file);
+					$num++;
+				}
+			}
+		}
+		else if((self::$config['type'] == 'memcached' || self::$config['type'] == 'memcache') && !empty(self::$mcache))
+		{
+			if(self::$mcache->flush())
+			{
+				//echo 'Removed Memcache';
+			}
+		}
+	}
+
+	public function get($key='', $group='', $passphrase='')
 	{
 		$value = '';
 
 		if(!empty($key))
 		{
-			$key = md5($key);
+			$key = md5($key.AUTH_KEY);
 
-			if(isset($this->static_cache[$key]))
+			if(isset(self::$static_cache[$key]))
 			{
-				return $this->static_cache[$key];
+				return self::$static_cache[$key];
 			}
 
-			$this->set_cache_type();
-
-			if($this->config['type'] == 'disk')
+			if(self::$config['type'] == 'disk')
 			{
 				if(file_exists(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache'))
 				{
 					$value = file_get_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache');
 				}
 			}
-			else if($this->config['type'] == 'memcached')
+			else if((self::$config['type'] == 'memcached' || self::$config['type'] == 'memcache') && !empty(self::$mcache))
 			{
-				$server = explode(':', $this->config['server']);
-
-				if(class_exists('Memcached'))
-				{
-					$this->mcache = new Memcached();
-					$this->mcache->addServer($server[0], $server[1]);
-					$value = $this->mcache->get($key);
-				}
-				else if(class_exists('Memcache'))
-				{
-					$this->mcache = new Memcache;
-					$this->mcache->addServer($server[0], $server[1]);
-					$value = $this->mcache->get($key);
-				}
+				$value = self::$mcache->get($key);
 			}
 		}
 
 		if($value !== '' && function_exists("base64_decode"))
 		{
 			$value = base64_decode($value);
+		}
+
+		if($passphrase)
+		{
+			$new_value = $value;
+			$path = array_merge(range('a', 'z'), range('A', 'Z'), range(0, 9));
+			$passphrase = str_replace(':', '', str_pad($passphrase, 62 , AUTH_KEY).implode('', $path));
+			$passphrase = array_values(array_unique(str_split($passphrase)));
+
+			$range = range(61, 0);
+
+			foreach ($range as $range_key => $range_val)
+			{
+				$new_value = str_replace($passphrase[$range_val].':', $path[$range_val], $new_value);
+			}
+
+			if(function_exists("base64_decode"))	// Compress Data if available to save disk space
+			{
+				$value = base64_decode($new_value);
+			}
 		}
 
 		if(!is_null($value))
@@ -321,13 +334,11 @@ class GRAVITATE_CACHE {
 		return $value;
 	}
 
-	public function set($key='', $value='', $expires=false, $group='')
+	public function set($key='', $value='', $expires=false, $group='', $passphrase='')
 	{
-		$key = md5($key);
+		$key = md5($key.AUTH_KEY);
 
-		$this->static_cache[$key] = $value;
-
-		$this->set_cache_type();
+		self::$static_cache[$key] = $value;
 
 		if($value === false)
 		{
@@ -344,7 +355,25 @@ class GRAVITATE_CACHE {
 			$value = base64_encode($value);
 		}
 
-		if($this->config['type'] == 'disk')
+		if($passphrase)
+		{
+			$new_value = $value;
+			$path = array_merge(range('a', 'z'), range('A', 'Z'), range(0, 9));
+			$passphrase = str_replace(':', '', str_pad($passphrase, 62 , AUTH_KEY).implode('', $path));
+			$passphrase = array_values(array_unique(str_split($passphrase)));
+
+			foreach ($path as $str_key => $str_val)
+			{
+				$new_value = str_replace($str_val, $passphrase[$str_key].':', $new_value);
+			}
+
+			if(function_exists("base64_encode"))	// Compress Data if available to save disk space
+			{
+				$value = base64_encode($new_value);
+			}
+		}
+
+		if(self::$config['type'] == 'disk')
 		{
 			if(!is_dir(WP_CONTENT_DIR.'/cache'))
 			{
@@ -361,15 +390,15 @@ class GRAVITATE_CACHE {
 				return file_put_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache', $value);
 			}
 		}
-		else if($this->config['type'] == 'memcached')
+		else if(!empty(self::$mcache))
 		{
-			if(class_exists('Memcached'))
+			if(self::$config['type'] == 'memcached')
 			{
-				return $this->mcache->set($key, $value, $expires);
+				return self::$mcache->set($key, $value, $expires);
 			}
-			else if(class_exists('Memcache'))
+			else if(self::$config['type'] == 'memcache')
 			{
-				return $this->mcache->set($key, $value, 0, $expires);
+				return self::$mcache->set($key, $value, 0, $expires);
 			}
 		}
 
@@ -377,5 +406,5 @@ class GRAVITATE_CACHE {
 	}
 }
 
-
+GRAVITATE_CACHE::init();
 

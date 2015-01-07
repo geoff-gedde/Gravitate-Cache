@@ -21,11 +21,8 @@ add_action('save_post', array( 'GRAVITATE_CACHE_INIT', 'save_post' ));
 add_action('updated_option', array( 'GRAVITATE_CACHE_INIT', 'updated_option' ));
 add_action('wp_ajax_gravitate_clear_cache', array( 'GRAVITATE_CACHE_INIT', 'ajax_clear_cache' ));
 add_action('admin_bar_menu', array( 'GRAVITATE_CACHE_INIT', 'admin_bar_menu' ), 999);
+add_action('init', array( 'GRAVITATE_CACHE_INIT', 'start_cache' ));
 
-if(!empty($gravitate_cache_class))
-{
-	add_action('init', array( $gravitate_cache_class, 'start_cache' ));
-}
 
 class GRAVITATE_CACHE_INIT {
 
@@ -146,11 +143,47 @@ class GRAVITATE_CACHE_INIT {
 		define('WP_CACHE', true);
 	}
 
+	static function start_cache()
+	{
+		include_once( ABSPATH . 'wp-admin/includes/plugin.php' );
+
+		if(is_plugin_active('gravitate-cache/gravitate-cache.php') && class_exists('GRAVITATE_CACHE'))
+		{
+			if(GRAVITATE_CACHE::can_page_cache())
+			{
+				ob_start(array(__CLASS__, 'page_buffer_cache'));
+			}
+			else
+			{
+				if(!defined('DOING_AJAX') || (defined('DOING_AJAX') && !DOING_AJAX))
+				{
+					add_action('shutdown', array('GRAVITATE_CACHE_INIT', 'shutdown'));
+				}
+			}
+		}
+	}
+
+	static function page_buffer_cache($buffer)
+	{
+		if(GRAVITATE_CACHE::can_page_cache())
+		{
+			// $buffer
+			GRAVITATE_CACHE::set($_SERVER['REQUEST_URI'], $buffer, 300);
+		}
+
+		return $buffer.self::shutdown();
+	}
+
+	static function shutdown()
+	{
+		GRAVITATE_CACHE::details();
+	}
+
 	static function save_post()
 	{
 		self::clear_all_cache();
 		self::pre_load_pages();
-		file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Post Saved\n\r", FILE_APPEND);
+		//file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Post Saved\n\r", FILE_APPEND);
 	}
 
 	static function ajax_clear_cache()
@@ -159,7 +192,7 @@ class GRAVITATE_CACHE_INIT {
 		{
 			self::clear_all_cache();
 			self::pre_load_pages();
-			file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Forced Clear \n\r", FILE_APPEND);
+			//file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Forced Clear \n\r", FILE_APPEND);
 			echo 'Cached has been Cleared Successfully!';
 		}
 		else
@@ -182,54 +215,24 @@ class GRAVITATE_CACHE_INIT {
 		{
 			self::clear_all_cache();
 			self::pre_load_pages();
-			file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Updated Option \n\r", FILE_APPEND);
+			//file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Updated Option \n\r", FILE_APPEND);
 		}
 	}
 
 	static function clear_all_cache()
 	{
 		self::clear_cache('.cache');
-		file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - ALL \n\r", FILE_APPEND);
+		//file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - ALL \n\r", FILE_APPEND);
 	}
 
 	private static function clear_cache($group='')
 	{
-		if(defined('WP_CONTENT_DIR'))
-		{
-			if(is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
-			{
-				foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/*'.$group.'*') as $file)
-				{
-					unlink($file);
-				}
-
-
-			}
-		}
+		GRAVITATE_CACHE::clear($group);
 	}
 
 	static function get_config()
 	{
-		$gravitate_cache_config = false;
-
-		if(file_exists(WP_CONTENT_DIR.'/gravitate-cache-config.php'))
-		{
-			include(WP_CONTENT_DIR.'/gravitate-cache-config.php');
-
-			if(!empty($gravitate_cache_config))
-			{
-				foreach ($gravitate_cache_config as $key => $value)
-				{
-					$def = str_replace('-', '_', strtoupper('GRAVITATE_CACHE_CONFIG_'.$key));
-					if(defined($def))
-					{
-						$gravitate_cache_config[$key] = constant($def);
-					}
-				}
-			}
-		}
-
-		return $gravitate_cache_config;
+		return GRAVITATE_CACHE::$config;
 	}
 
 	private static function pre_load_pages()
@@ -260,7 +263,7 @@ class GRAVITATE_CACHE_INIT {
 									{
 										if(strpos($item->url, site_url()) !== false)
 										{
-											self::pre_load_page($item->url);
+											self::pre_load_page($item->url, $config);
 										}
 									}
 								}
@@ -273,7 +276,7 @@ class GRAVITATE_CACHE_INIT {
 									{
 										foreach ($matches[1] as $url)
 										{
-											self::pre_load_page($url);
+											self::pre_load_page($url, $config);
 										}
 									}
 								}
@@ -290,32 +293,61 @@ class GRAVITATE_CACHE_INIT {
 				{
 					foreach ($pages as $page)
 					{
-						self::pre_load_page(get_permalink($page->ID));
+						self::pre_load_page(get_permalink($page->ID), $config);
 					}
 				}
 			}
 
 			// Preload Home Page
-			self::pre_load_page(site_url());
+			self::pre_load_page(site_url(), $config);
 		}
 	}
 
-	private static function pre_load_page($url)
+	private static function pre_load_page($page_url, $config)
 	{
-		if(!empty($url))
+		if(!empty($page_url))
 		{
-			$headers = get_headers($url);
-
-			// If file error then remove from preload
-			if(empty($headers[0]) || strpos($headers[0], '200') === false)
+			if(!empty($config['excluded_urls']))
 			{
-				$nurl = str_replace('//', '', $url);
-				$split = substr($nurl, strpos($nurl, '/'));
-				$hash = md5($split);
-				$file = WP_CONTENT_DIR.'/cache/gravitate_cache/'.$hash.'.cache';
-				if(file_exists($file))
+				foreach (array_map('trim', explode(',', $config['excluded_urls'])) as $url)
 				{
-					unlink($file);
+					if(!empty($url))
+					{
+						$original_url = $url;
+
+						if(substr($url, 0, 1) == '/')
+						{
+							$url = '\\'.$url;
+						}
+
+						if(substr($url, -1) == '/')
+						{
+							$url = substr($url, 0, -1).'\\/';
+						}
+
+						if(substr($url, -2) == '/$')
+						{
+							$url = substr($url, 0, -2).'\\/$';
+						}
+
+						if(!preg_match('/'.$url.'/', $page_url))
+						{
+							$headers = get_headers($page_url);
+
+							// If file error then remove from preload
+							if(empty($headers[0]) || strpos($headers[0], '200') === false)
+							{
+								$nurl = str_replace('//', '', $page_url);
+								$split = substr($nurl, strpos($nurl, '/'));
+								$hash = md5($split);
+								$file = WP_CONTENT_DIR.'/cache/gravitate_cache/'.$hash.'.cache';
+								if(file_exists($file))
+								{
+									unlink($file);
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -395,7 +427,7 @@ class GRAVITATE_CACHE_INIT {
 
 						if(!empty($_POST['config']['type']))
 						{
-							$config_str = str_replace("'disk'", "'".sanitize_key($_POST['config']['type'])."'", $config_str);
+							$config_str = str_replace("'auto'", "'".sanitize_key($_POST['config']['type'])."'", $config_str);
 							$config['type'] = $_POST['config']['type'];
 						}
 

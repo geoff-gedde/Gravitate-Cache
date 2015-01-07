@@ -9,19 +9,19 @@
  */
 class GRAVITATE_CACHE_WPDB extends wpdb
 {
-	private $gravitate_cache = false;
 	private $gravitate_config;
 	private $gravitate_ignores;
 	private $gravitate_cached_items = array();
 	private $gravitate_raw_items = array();
 	private $gravitate_fired_items = array();
+	private $gravitate_debug = false;
 
-	function __construct($dbuser, $dbpassword, $dbname, $dbhost, $class, $config)
+	function __construct($dbuser, $dbpassword, $dbname, $dbhost)
 	{
 		parent::__construct($dbuser, $dbpassword, $dbname, $dbhost);
 
-		$this->gravitate_cache = $class;
-		$this->gravitate_config = $config;
+		$this->gravitate_config = GRAVITATE_CACHE::$config;
+		$this->gravitate_debug = GRAVITATE_CACHE::$debug;
 		//$this->gravitate_config['database_enabled'] = false;
 
 		$this->gravitate_ignores = array(
@@ -33,7 +33,6 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 			'_edit_lock',
 			'_nonce',
 			'_logins',
-			'ORDER BY umeta_id ASC',
 			'_random_seed',
 			'_stats',
 			'_transient_timeout_plugin_slugs',
@@ -47,7 +46,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 			'_wp_session_',
 		);
 
-
+		//$this->gravitate_ignores[] = 'ORDER BY umeta_id ASC';
 
 	}
 
@@ -81,40 +80,43 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 
 	final private function get_gravitate_cache($query=false)
 	{
-		$fired_query = $query;
-
-		if($this->gravitate_is_query_ignored($query))
+		if($this->gravitate_debug)
 		{
-			$fired_query.=' - REASON: Ignored List';
+			$fired_query = $query;
+
+			if($this->gravitate_is_query_ignored($query))
+			{
+				$fired_query.=' - REASON: Ignored List';
+			}
+
+			if(!class_exists('GRAVITATE_CACHE'))
+			{
+				$fired_query.=' - REASON: No Cache Object';
+			}
+
+			if(!$query)
+			{
+				$fired_query.=' - REASON: Query Empty';
+			}
+
+			if(empty($this->gravitate_config['database_enabled']))
+			{
+				$fired_query.=' - REASON: DB Caching Disabled';
+			}
+
+			$this->gravitate_fired_items[] = $fired_query.' - '.md5($query);
 		}
 
-		if(!$this->gravitate_cache)
+		if(empty($_POST) && !$this->gravitate_is_query_ignored($query) && class_exists('GRAVITATE_CACHE') && $query && !empty($this->gravitate_config['database_enabled']))
 		{
-			$fired_query.=' - REASON: No Cache Object';
-		}
-
-		if(!$query)
-		{
-			$fired_query.=' - REASON: Query Empty';
-		}
-
-		if(empty($this->gravitate_config['database_enabled']))
-		{
-			$fired_query.=' - REASON: DB Caching Disabled';
-		}
-
-		$this->gravitate_fired_items[] = $fired_query.' - '.md5($query);
-
-		if(!$this->gravitate_is_query_ignored($query) && $this->gravitate_cache && $query && !empty($this->gravitate_config['database_enabled']))
-		{
-			$cache = $this->gravitate_cache->get($query, 'db');
+			$cache = GRAVITATE_CACHE::get($query, 'db', AUTH_KEY);
 			if(!empty($cache) && is_array($cache))
 			{
 				$results = $cache['results'];
 				$this->last_result = $cache['last_result'];
 				$this->num_rows = $cache['num_rows'];
 
-				$this->gravitate_cached_items[] = $query;
+				$this->gravitate_cached_items[] = str_replace($this->prefix, '*_', $query);
 
 				return $results;
 			}
@@ -125,10 +127,10 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 
 	final private function set_gravitate_cache($query=false, $results=false)
 	{
-		if($this->gravitate_cache && $query && $results !== false && !empty($this->gravitate_config['database_enabled']))
+		if(class_exists('GRAVITATE_CACHE') && $query && $results !== false && !empty($this->gravitate_config['database_enabled']))
 		{
 			$cache_results = array('results'=>$results,'last_result'=>$this->last_result,'num_rows'=>$this->num_rows);
-			return $this->gravitate_cache->set($query, $cache_results, false, 'db');
+			return GRAVITATE_CACHE::set($query, $cache_results, false, 'db', AUTH_KEY);
 		}
 
 		return false;
@@ -139,6 +141,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 		$results = $this->get_gravitate_cache('get_results::'.$query);
 		if($results === false)
 		{
+			$this->gravitate_raw_items[] = 'get_results::'.str_replace($this->prefix, '*_', $query);
 			$results = parent::get_results( $query, $output);
 			$this->set_gravitate_cache('get_results::'.$query, $results);
 		}
@@ -150,6 +153,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 		$results = $this->get_gravitate_cache('get_row::'.$query);
 		if($results === false)
 		{
+			$this->gravitate_raw_items[] = 'get_row::'.str_replace($this->prefix, '*_', $query);
 			$results = parent::get_row( $query, $output, $y);
 			$this->set_gravitate_cache('get_row::'.$query, $results);
 		}
@@ -161,6 +165,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 		$results = $this->get_gravitate_cache('get_var::'.$query);
 		if($results === false)
 		{
+			$this->gravitate_raw_items[] = 'get_var::'.str_replace($this->prefix, '*_', $query);
 			$results = parent::get_var( $query, $x, $y);
 			$this->set_gravitate_cache('get_var::'.$query, $results);
 		}
@@ -172,6 +177,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 		$results = $this->get_gravitate_cache('get_col::'.$query);
 		if($results === false)
 		{
+			$this->gravitate_raw_items[] = 'get_col::'.str_replace($this->prefix, '*_', $query);
 			$results = parent::get_col( $query, $x);
 			$this->set_gravitate_cache('get_col::'.$query, $results);
 		}
@@ -180,13 +186,14 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 
 	final function query( $query )
 	{
-		$this->gravitate_raw_items[] = $query;
-
 		// Check Select
 		if(preg_match( '/^\s*(select)\s/i', $query))
 		{
 			// Not sure if we can do anything here.
-			//$this->gravitate_raw_items[] = $query;
+			if(!in_array('get_var::'.$query, $this->gravitate_raw_items) && !in_array('get_row::'.$query, $this->gravitate_raw_items) && !in_array('get_results::'.$query, $this->gravitate_raw_items) && !in_array('get_col::'.$query, $this->gravitate_raw_items))
+			{
+				$this->gravitate_raw_items[] = str_replace($this->prefix, '*_', $query);
+			}
 		}
 
 		$results = parent::query($query);
@@ -221,14 +228,6 @@ if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/gravitate-cache-con
 	if(!empty($gravitate_cache_config['database_enabled']) && file_exists(WP_CONTENT_DIR.'/plugins/gravitate-cache/gravitate-cache-class.php'))
 	{
 		include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/gravitate-cache-class.php');
-
-		if(class_exists('GRAVITATE_CACHE'))
-		{
-			if(empty($gravitate_cache_class))
-			{
-				$gravitate_cache_class = new GRAVITATE_CACHE();
-			}
-		}
 	}
 }
 
