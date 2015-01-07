@@ -252,9 +252,10 @@ class GRAVITATE_CACHE_INIT {
 
 						if(isset($locations[ $menu ]))
 						{
-							if(!empty($menu->termd_id))
+							$menu = wp_get_nav_menu_object( $locations[ $menu ] );
+
+							if(!empty($menu->term_id))
 							{
-								$menu = wp_get_nav_menu_object( $locations[ $menu ] );
 								$items = wp_get_nav_menu_items( $menu->term_id );
 
 								if(!empty($items))
@@ -267,17 +268,18 @@ class GRAVITATE_CACHE_INIT {
 										}
 									}
 								}
-								else
-								{
-									$menu = wp_page_menu( array('echo' => false) );
-									preg_match_all('/href\=\"([^"]*)\"/s', $menu, $matches);
+							}
 
-									if(!empty($matches[1]))
+							if(empty($items))
+							{
+								$menu = wp_page_menu( array('echo' => false) );
+								preg_match_all('/href\=\"([^"]*)\"/s', $menu, $matches);
+
+								if(!empty($matches[1]))
+								{
+									foreach ($matches[1] as $url)
 									{
-										foreach ($matches[1] as $url)
-										{
-											self::pre_load_page($url, $config);
-										}
+										self::pre_load_page($url, $config);
 									}
 								}
 							}
