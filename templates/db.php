@@ -4,9 +4,10 @@
 ** Created by Gravitate Cache Plugin **
 **************************************/
 
-if(class_exists('GRAVITATE_CACHE') && defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/plugins/gravitate-cache/gravitate-db-class.php'))
+if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-db-class.php'))
 {
-	include(WP_CONTENT_DIR.'/plugins/gravitate-cache/gravitate-db-class.php');
+	include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-cache-class.php');
+	include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-db-class.php');
 
 	if(class_exists('GRAVITATE_CACHE_WPDB') && ((!$wpdb) || get_class($wpdb) != 'GRAVITATE_CACHE_WPDB'))
 	{
