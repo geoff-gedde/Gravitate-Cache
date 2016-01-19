@@ -129,9 +129,9 @@ class WP_Object_Cache {
 
 	function __construct() {
 
-		if ( !empty(GRAVITATE_CACHE::$config['server']) )
+		if ( !empty(GRAVITATE_CACHE::$settings['server']) )
 		{
-			$buckets = explode(',',GRAVITATE_CACHE::$config['server']);
+			$buckets = explode(',',GRAVITATE_CACHE::$settings['server']);
 		}
 		else
 		{
@@ -469,3 +469,5 @@ else: // No Memcached
 	}
 
 endif;
+
+

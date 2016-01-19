@@ -1,11 +1,11 @@
 <?php
 
-if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/plugins/gravitate-cache/gravitate-cache-class.php'))
+if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-cache-class.php'))
 {
-	include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/gravitate-cache-class.php');
+	include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-cache-class.php');
 
-	if(!empty(GRAVITATE_CACHE::$config['type']) && in_array(GRAVITATE_CACHE::$config['type'], array('memcache','memcached')))
+	if(!empty(GRAVITATE_CACHE::$settings['type']) && in_array(GRAVITATE_CACHE::$settings['type'], array('memcache','memcached','redis')))
 	{
-		include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-object-cache-class-'.GRAVITATE_CACHE::$config['type'].'.php');
+		include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-object-cache-class.php');
 	}
 }

@@ -1,100 +1,5 @@
 <?php
 
-// ini_set('error_reporting', E_ALL);
-// ini_set('display_errors', 1);
-
-// $num = bin2hex(md5(AUTH_SALT));
-
-
-// $var = 'Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. .This is a Very Long String for Sure 1234567890';
-
-
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = bin2hex(bin2hex(base64_encode($var)));
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// exit;
-
-// //chunk_split($var, 3,
-
-// $var = number_format((floor(bin2hex(bin2hex($var)))), 0, '', '');
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// //$var str_split($var, 3
-
-// echo '<pre>';print_r($num);echo '</pre>';
-
-
-// $var = number_format(($var + $num), 0, '', '');
-
-
-// echo '<pre>- - - <br>';print_r($var);echo '<br>- - - - - </pre>';
-
-// $var = ($var - 8945934879283579572987498759287298742);
-
-// $var  = number_format($var, 0, '', '');
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = pack("H*" , $var);
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-
-
-
-
-
-
-
-
-
-
-
-// exit;
-
-
-// $var = chunk_split($var, 3, md5(AUTH_SALT));
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = chunk_split($var, 3, md5(AUTH_SALT));
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-
-
-// $var = str_replace(md5(AUTH_SALT), '', $var);
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = gzdeflate($var);
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = base64_encode($var);
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = base64_decode($var);
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = gzinflate($var);
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// $var = base64_decode($var);
-
-// echo '<pre>';print_r($var);echo '</pre>';
-
-// exit;
-
-
 /**************************************
 ** Created by Gravitate Cache Plugin **
 **************************************/
@@ -211,13 +116,17 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 			$this->gravitate_cache_fired_items[] = $fired_query.' - '.md5($query);
 		}
 
-
 		if(defined('WP_ADMIN') && GRAVITATE_CACHE::is_enabled('exclude_wp_admin', 'excludes'))
 		{
 			return false;
 		}
 
 		if(GRAVITATE_CACHE::get_user_logged_in_cookie() && GRAVITATE_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
+		{
+			return false;
+		}
+
+		if(!GRAVITATE_CACHE::can_cache())
 		{
 			return false;
 		}
@@ -243,6 +152,11 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 
 	final private function set_gravitate_cache($query=false, $results=false)
 	{
+		if(!GRAVITATE_CACHE::can_cache())
+		{
+			return false;
+		}
+
 		if(defined('WP_ADMIN') && GRAVITATE_CACHE::is_enabled('exclude_wp_admin', 'excludes'))
 		{
 			return false;
@@ -338,7 +252,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 			preg_match_all('/('.$this->prefix.'[^(\s|\.]+)/', $query, $tables);
 			if(!empty($tables[1]))
 			{
-				GRAVITATE_CACHE::clear('/('.implode('|',$tables[1]).')/');
+				GRAVITATE_CACHE::clear('/db\:\:.*('.str_replace("`", "", implode('|',$tables[1])).')/');
 			}
 		}
 

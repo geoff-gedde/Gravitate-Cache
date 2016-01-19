@@ -14,18 +14,28 @@ class GRAVITATE_CACHE_DRIVER_REDIS extends GRAVITATE_CACHE_DRIVER {
 	{
 		if($this->is_enabled('database') || $this->is_enabled('page') || $this->is_enabled('object'))
 		{
-			if(!empty($this->config['server']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'redis'))
+			if(!empty($this->config['servers']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcached'))
 			{
-				$server = explode(':', $this->config['server']);
-
-				if(class_exists('Redis') && !empty($server[0]) && !empty($server[1]))
+				if(class_exists('Redis'))
 				{
 					if($this->connection = new Redis())
 					{
-						if($this->connection->pconnect($server[0], $server[1]))
+						$added_server = false;
+
+						foreach(explode(',', $this->config['servers']) as $serverport)
 						{
-							return true;
+							$split = explode(':', $serverport);
+
+							$server = ($split[0] ? $split[0] : '127.0.0.1');
+							$port = ($split[1] ? $split[1] : '6379');
+
+							if($this->connection->pconnect($server, $port))
+							{
+								$added_server = true;
+							}
 						}
+
+						return $added_server;
 					}
 				}
 			}
@@ -46,7 +56,7 @@ class GRAVITATE_CACHE_DRIVER_REDIS extends GRAVITATE_CACHE_DRIVER {
 		return $this->connection->flushAll();
 	}
 
-	public function delete($key='')
+	public function delete($key='', $group='')
 	{
 		$key = $this->key($key);
 		return $this->connection->delete($key);

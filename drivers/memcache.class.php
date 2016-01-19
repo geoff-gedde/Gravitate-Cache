@@ -14,18 +14,28 @@ class GRAVITATE_CACHE_DRIVER_MEMCACHE extends GRAVITATE_CACHE_DRIVER {
 	{
 		if($this->is_enabled('database') || $this->is_enabled('page') || $this->is_enabled('object'))
 		{
-			if(!empty($this->config['server']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcache'))
+			if(!empty($this->config['servers']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcache'))
 			{
-				$server = explode(':', $this->config['server']);
-
-				if(class_exists('Memcache') && !empty($server[0]) && !empty($server[1]))
+				if(class_exists('Memcache'))
 				{
 					if($this->connection = new Memcache)
 					{
-						if($this->connection->addServer($server[0], $server[1]))
+						$added_server = false;
+
+						foreach(explode(',', $this->config['servers']) as $serverport)
 						{
-							return true;
+							$split = explode(':', $serverport);
+
+							$server = ($split[0] ? $split[0] : '127.0.0.1');
+							$port = ($split[1] ? $split[1] : '11211');
+
+							if($this->connection->addServer($server, $port))
+							{
+								$added_server = true;
+							}
 						}
+
+						return $added_server;
 					}
 				}
 			}
@@ -46,7 +56,7 @@ class GRAVITATE_CACHE_DRIVER_MEMCACHE extends GRAVITATE_CACHE_DRIVER {
 		return $this->connection->flush();
 	}
 
-	public function delete($key='')
+	public function delete($key='', $group='')
 	{
 		$key = $this->key($key);
 		return $this->connection->delete($key);

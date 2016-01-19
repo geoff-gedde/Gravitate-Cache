@@ -14,40 +14,55 @@ class GRAVITATE_CACHE_DRIVER_MEMCACHED extends GRAVITATE_CACHE_DRIVER {
 	{
 		if($this->is_enabled('database') || $this->is_enabled('page') || $this->is_enabled('object'))
 		{
-			if(!empty($this->config['server']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcached'))
+			if(!empty($this->config['servers']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcached'))
 			{
-				$server = explode(':', $this->config['server']);
-
-				if(class_exists('Memcached') && !empty($server[0]) && !empty($server[1]))
+				if(class_exists('Memcached'))
 				{
 					if($this->connection = new Memcached())
 					{
-						if($this->connection->addServer($server[0], $server[1]))
+						$added_server = false;
+
+						foreach(explode(',', $this->config['servers']) as $serverport)
 						{
-							return true;
+							$split = explode(':', $serverport);
+
+							$server = ($split[0] ? $split[0] : '127.0.0.1');
+							$port = ($split[1] ? $split[1] : '11211');
+
+							if($this->connection->addServer($server, $port))
+							{
+								$added_server = true;
+							}
 						}
+
+						return $added_server;
 					}
 				}
 			}
 		}
 
 		return false;
-
 	}
-
-	// public function key($key='')
-	// {
-	// 	$domain = (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '');
-	// 	return $domain.'::'.trim($key);
-	// }
 
 	public function flush()
 	{
 		return $this->connection->flush();
 	}
 
-	public function delete($key='')
+	public function delete($key='', $group='')
 	{
+		if($all_keys = $this->get('__getAllKeys'))
+		{
+			if(is_array($all_keys))
+			{
+				if($index = array_search($this->key($key), $all_keys))
+				{
+					unset($all_keys[$index]);
+				}
+				$this->connection->set($this->key('__getAllKeys'), array_unique($all_keys), 0);
+			}
+		}
+
 		$key = $this->key($key);
 		return $this->connection->delete($key);
 	}
@@ -61,7 +76,22 @@ class GRAVITATE_CACHE_DRIVER_MEMCACHED extends GRAVITATE_CACHE_DRIVER {
 	public function set($key='', $value='', $expires=0, $group='')
 	{
 		$key = $this->key($key);
-		return $this->connection->set($key, $value, $expires);
+		$result = $this->connection->set($key, $value, $expires);
+
+		if($result)
+		{
+			$all_keys = $this->get('__getAllKeys');
+
+			if(empty($all_keys))
+			{
+				$all_keys = array();
+			}
+
+			$all_keys[] = $key;
+			$this->connection->set($this->key('__getAllKeys'), array_unique($all_keys), 0);
+		}
+
+		return $result;
 	}
 
 	public function increment($key='', $value=1, $group='')
@@ -84,6 +114,7 @@ class GRAVITATE_CACHE_DRIVER_MEMCACHED extends GRAVITATE_CACHE_DRIVER {
 			{
 				foreach ($keys as $key)
 				{
+					$key = str_replace($this->key(), '', $key);
 					$this->delete($key);
 				}
 
@@ -94,23 +125,17 @@ class GRAVITATE_CACHE_DRIVER_MEMCACHED extends GRAVITATE_CACHE_DRIVER {
 		return false;
 	}
 
-	public function get_all_keys($regex='*')
+	public function get_all_keys($regex='/(.*)/')
 	{
 		$all_keys = array();
+		$keys = $this->get('__getAllKeys');
+		$site_key = $this->key();
 
-		if(method_exists($this->connection, 'getAllKeys'))
+		foreach ((array) $keys as $key)
 		{
-			if($keys = $this->connection->getAllKeys())
+			if(preg_match($regex, $key) && strpos($key, $site_key) !== false)
 			{
-				$site_key = $this->key();
-
-				foreach ($keys as $key)
-				{
-					if(preg_match($regex, $key) && strpos($key, $site_key) !== false)
-					{
-						$all_keys[] = $key;
-					}
-				}
+				$all_keys[] = $key;
 			}
 		}
 

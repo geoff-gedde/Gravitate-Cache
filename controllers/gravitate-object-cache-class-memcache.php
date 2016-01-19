@@ -517,9 +517,9 @@ class WP_Object_Cache {
 
 	function WP_Object_Cache()
 	{
-		if ( !empty(GRAVITATE_CACHE::$config['server']) )
+		if ( !empty(GRAVITATE_CACHE::$settings['server']) )
 		{
-			$buckets = explode(',',GRAVITATE_CACHE::$config['server']);
+			$buckets = explode(',',GRAVITATE_CACHE::$settings['server']);
 		}
 		else
 		{

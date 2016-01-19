@@ -12,8 +12,7 @@ class GRAVITATE_CACHE_DRIVER {
 
 	public function key($key='')
 	{
-		$domain = (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '');
-		return $domain.'::'.trim($key);
+		return GRAVITATE_CACHE::site_key($key);
 	}
 
 	/**

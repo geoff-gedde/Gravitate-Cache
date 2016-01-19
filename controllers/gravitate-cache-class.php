@@ -1,7 +1,7 @@
 <?php
 
-ini_set('error_reporting', E_ALL);
-ini_set('display_errors', 1);
+// ini_set('error_reporting', E_ALL);
+// ini_set('display_errors', 1);
 
 class GRAVITATE_CACHE {
 
@@ -90,11 +90,17 @@ class GRAVITATE_CACHE {
 	 *
 	 *
 	 */
-	public static function get_userid_hash()
+	public static function get_userid_hash($with_user_info=true)
 	{
-		$cookiehash = self::get_user_logged_in_cookie();
-
-		$hash = (!empty($cookiehash) ? md5($cookiehash) : md5(AUTH_KEY));
+		if($with_user_info)
+		{
+			$cookiehash = self::get_user_logged_in_cookie();
+			$hash = (!empty($cookiehash) ? md5($cookiehash) : md5(AUTH_KEY));
+		}
+		else
+		{
+			$hash = md5(AUTH_KEY);
+		}
 
 		return $hash;
 	}
@@ -127,7 +133,7 @@ class GRAVITATE_CACHE {
 	{
 		if(self::is_enabled('page') && self::can_page_cache())
 		{
-			$cache = self::get('page::uid'.self::get_userid_hash().'::'.$_SERVER['REQUEST_URI'], 'pg', AUTH_SALT);
+			$cache = self::get(self::get_page_key(), 'page');
 			if(!empty($cache['value']))
 			{
 				echo $cache['value']."\n<!-- Gravitate Cache - Served from Page Cache on (".date('m/d/Y H:i:s', $cache['time']).") -->";
@@ -141,6 +147,23 @@ class GRAVITATE_CACHE {
 		}
 	}
 
+	public static function site_key($key='')
+	{
+		$domain = (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '');
+		return $domain.'::'.trim($key);
+	}
+
+	/**
+	 *
+	 *
+	 *
+	 */
+	public static function get_page_key($url='', $logged_in=true)
+	{
+		$url = ($url ? $url : $_SERVER['REQUEST_URI']);
+		return 'page::uid'.self::get_userid_hash($logged_in).'::'.$url;
+	}
+
 	/**
 	 *
 	 *
@@ -148,7 +171,7 @@ class GRAVITATE_CACHE {
 	 */
 	public static function details()
 	{
-		global $wpdb;
+		global $wpdb, $table_prefix;
 
 		$output = '';
 
@@ -165,6 +188,11 @@ class GRAVITATE_CACHE {
 			}
 		}
 
+		if(self::is_enabled('page') && self::can_page_cache())
+		{
+			$output.= "\n<!-- Gravitate Cache - Page Not Cached - Not Cached Yet. Try Reloading -->";
+		}
+
 		if(self::is_enabled('database') && method_exists($wpdb,'get_gravitate_cached_items'))
 		{
 			$output.= "\n<!-- Gravitate Cache - Database Cache Enabled - ".count($wpdb->get_gravitate_cached_items())." Querie(s) pulled from cache. ".count($wpdb->get_gravitate_cache_raw_items())." Raw Querie(s).  -->";
@@ -173,6 +201,23 @@ class GRAVITATE_CACHE {
 		if(!self::is_enabled('database'))
 		{
 			$output.= "\n<!-- Gravitate Cache - Database Cache Disabled -->";
+		}
+
+		if(!self::is_enabled('object'))
+		{
+			$output.= "\n<!-- Gravitate Cache - Object Cache Disabled -->";
+		}
+
+		if(self::is_enabled('object'))
+		{
+			global $wp_object_cache;
+
+			if($wp_object_cache)
+			{
+				$output.= "\n<!-- Gravitate Cache - Object Cache Stats - ";
+				$output.= "Cache Hits: ".$wp_object_cache->grav_cache_hits." / ";
+				$output.= "Cache Misses: ".$wp_object_cache->grav_cache_misses." -->";
+			}
 		}
 
 		if(self::$settings['debug'])
@@ -199,12 +244,28 @@ class GRAVITATE_CACHE {
 
 				$output.= "\n -->";
 			}
+
+			$output.= "\n<!-- ALL KEYS ";
+			if(self::$driver)
+			{
+				if($keys = self::$driver->get_all_keys())
+				{
+					$output.= " (".count($keys).") \n";
+					foreach ($keys as $key => $value)
+					{
+						$output.= "\t".preg_replace('/[0-9a-z]{32}/', '*', str_replace(array($table_prefix, self::site_key()), '*', $value))."\n";
+						//$output.= "\t".$value."\n";
+					}
+				}
+			}
+			$output.= " -->";
 		}
 
 		if(defined('GRAVITATE_CACHE_TIMESTART') && GRAVITATE_CACHE_TIMESTART)
 		{
 			$output.= "\n<!-- Gravitate Cache - DEBUG: Server Execution Time was ".sprintf("%01.6f", (microtime(true)-GRAVITATE_CACHE_TIMESTART))." Seconds -->";
 		}
+
 
 		echo $output;
 
@@ -229,28 +290,18 @@ class GRAVITATE_CACHE {
 		return false;
 	}
 
+
 	/**
 	 *
 	 *
 	 *
 	 */
-	public static function can_page_cache()
+	public static function can_cache()
 	{
-		if(!self::is_enabled('page'))
-		{
-			self::$no_cache_reason = 'Page Cache Disabled';
-			return false;
-		}
 
 		if(defined('DOING_AJAX') && DOING_AJAX)
 		{
 			self::$no_cache_reason = 'Ajax was initilized';
-			return false;
-		}
-
-		if(defined('WP_ADMIN') && self::is_enabled('exclude_wp_admin', 'excludes'))
-		{
-			self::$no_cache_reason = 'Admin Panel is Excluded';
 			return false;
 		}
 
@@ -293,6 +344,33 @@ class GRAVITATE_CACHE {
 		if(!empty($_POST))
 		{
 			self::$no_cache_reason = 'Page has Submited POST Data';
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 *
+	 *
+	 *
+	 */
+	public static function can_page_cache()
+	{
+		if(!self::can_cache())
+		{
+			return false;
+		}
+
+		if(!self::is_enabled('page'))
+		{
+			self::$no_cache_reason = 'Page Cache Disabled';
+			return false;
+		}
+
+		if(defined('WP_ADMIN') && self::is_enabled('exclude_wp_admin', 'excludes'))
+		{
+			self::$no_cache_reason = 'Admin Panel is Excluded';
 			return false;
 		}
 
@@ -368,11 +446,25 @@ class GRAVITATE_CACHE {
 	 *
 	 *
 	 */
+	public static function flush()
+	{
+		if(self::$driver)
+		{
+			return self::$driver->flush();
+		}
+		return false;
+	}
+
+	/**
+	 *
+	 *
+	 *
+	 */
 	public static function clear($regex='/(.*)/')
 	{
 		if(self::$driver)
 		{
-			self::$driver->flush();
+			//self::$driver->flush();
 			return self::$driver->clear($regex);
 		}
 		return false;
@@ -383,11 +475,11 @@ class GRAVITATE_CACHE {
 	 *
 	 *
 	 */
-	public static function delete($key='') // clear_key
+	public static function delete($key='', $group='') // clear_key
 	{
 		if(self::$driver)
 		{
-			return self::$driver->delete($key);
+			return self::$driver->delete($key, $group);
 		}
 	}
 
@@ -402,6 +494,28 @@ class GRAVITATE_CACHE {
 		{
 			return self::$driver->get_all_keys($regex);
 		}
+	}
+
+
+	/**
+	 *
+	 *
+	 *
+	 */
+	public static function has_key($key)
+	{
+		if(self::$driver)
+		{
+			if($keys = self::$driver->get_all_keys())
+			{
+				if(in_array(self::$driver->key($key), $keys))
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -420,7 +534,15 @@ class GRAVITATE_CACHE {
 				return self::$static_cache[$key];
 			}
 
-			$value = self::$driver->get($key);
+			if(self::has_key($key))
+			{
+				$value = self::$driver->get($key);
+			}
+		}
+
+		if(strpos($key, 'object') !== false)
+		{
+			return $value;
 		}
 
 		if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
@@ -493,41 +615,45 @@ class GRAVITATE_CACHE {
 			return false;
 		}
 
-		$value = array('time' => time(), 'value' => $value);
-
 		self::$static_cache[$key] = $value;
 
-		$value = serialize($value);
-
-		if(function_exists("base64_encode"))	// Compress Data if available to save disk space
+		if(strpos($key, 'object') === false)
 		{
-			$value = base64_encode($value);
-		}
 
-		if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
-		{
-			$passphrase = (defined('AUTH_SALT') && !empty(AUTH_SALT) ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
-		}
+			$value = array('time' => time(), 'value' => $value);
 
-		if($passphrase && function_exists("base64_encode"))
-		{
-			if(function_exists('openssl_encrypt'))
+			$value = serialize($value);
+
+			if(function_exists("base64_encode"))	// Compress Data if available to save disk space
 			{
-				$value = openssl_encrypt($value, 'aes128', $passphrase, 0, '1234567890193756');
+				$value = base64_encode($value);
 			}
-			else
+
+			if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
 			{
-				$new_value = $value;
-				$path = array_merge(range('a', 'z'), range('A', 'Z'), range(0, 9));
-				$passphrase = str_replace(':', '', str_pad($passphrase, 62 , AUTH_KEY).implode('', $path));
-				$passphrase = array_values(array_unique(str_split($passphrase)));
+				$passphrase = (defined('AUTH_SALT') && !empty(AUTH_SALT) ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
+			}
 
-				foreach ($path as $str_key => $str_val)
+			if($passphrase && function_exists("base64_encode"))
+			{
+				if(function_exists('openssl_encrypt'))
 				{
-					$new_value = str_replace($str_val, $passphrase[$str_key].':', $new_value);
+					$value = openssl_encrypt($value, 'aes128', $passphrase, 0, '1234567890193756');
 				}
+				else
+				{
+					$new_value = $value;
+					$path = array_merge(range('a', 'z'), range('A', 'Z'), range(0, 9));
+					$passphrase = str_replace(':', '', str_pad($passphrase, 62 , AUTH_KEY).implode('', $path));
+					$passphrase = array_values(array_unique(str_split($passphrase)));
 
-				$value = $new_value;
+					foreach ($path as $str_key => $str_val)
+					{
+						$new_value = str_replace($str_val, $passphrase[$str_key].':', $new_value);
+					}
+
+					$value = $new_value;
+				}
 			}
 		}
 
