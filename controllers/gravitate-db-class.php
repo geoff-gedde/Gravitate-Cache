@@ -7,7 +7,7 @@
 /**
  * Extend the native wpdb class to add caching functionality
  */
-class GRAVITATE_CACHE_WPDB extends wpdb
+class GRAV_CACHE_WPDB extends wpdb
 {
 	private $gravitate_cache_settings;
 	private $gravitate_cache_ignores;
@@ -20,7 +20,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 	{
 		parent::__construct($dbuser, $dbpassword, $dbname, $dbhost);
 
-		$this->gravitate_cache_settings = GRAVITATE_CACHE::$settings;
+		$this->gravitate_cache_settings = GRAV_CACHE::$settings;
 		$this->gravitate_cache_ignores = array(
 			'_comment',
 			'_cron',
@@ -98,7 +98,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 				$fired_query.=' - REASON: Ignored List';
 			}
 
-			if(!class_exists('GRAVITATE_CACHE'))
+			if(!class_exists('GRAV_CACHE'))
 			{
 				$fired_query.=' - REASON: No Cache Object';
 			}
@@ -108,7 +108,7 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 				$fired_query.=' - REASON: Query Empty';
 			}
 
-			if(class_exists('GRAVITATE_CACHE') && !GRAVITATE_CACHE::is_enabled('database'))
+			if(class_exists('GRAV_CACHE') && !GRAV_CACHE::is_enabled('database'))
 			{
 				$fired_query.=' - REASON: DB Caching Disabled';
 			}
@@ -116,24 +116,24 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 			$this->gravitate_cache_fired_items[] = $fired_query.' - '.md5($query);
 		}
 
-		if(defined('WP_ADMIN') && GRAVITATE_CACHE::is_enabled('exclude_wp_admin', 'excludes'))
+		if(defined('WP_ADMIN') && GRAV_CACHE::is_enabled('exclude_wp_admin', 'excludes'))
 		{
 			return false;
 		}
 
-		if(GRAVITATE_CACHE::get_user_logged_in_cookie() && GRAVITATE_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
+		if(GRAV_CACHE::get_user_logged_in_cookie() && GRAV_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
 		{
 			return false;
 		}
 
-		if(!GRAVITATE_CACHE::can_cache())
+		if(!GRAV_CACHE::can_cache())
 		{
 			return false;
 		}
 
-		if(empty($_POST) && !$this->gravitate_cache_is_query_ignored($query) && class_exists('GRAVITATE_CACHE') && $query && GRAVITATE_CACHE::is_enabled('database'))
+		if(empty($_POST) && !$this->gravitate_cache_is_query_ignored($query) && class_exists('GRAV_CACHE') && $query && GRAV_CACHE::is_enabled('database'))
 		{
-			$cache = GRAVITATE_CACHE::get($this->get_key($query), 'db', $this->passphrase);
+			$cache = GRAV_CACHE::get($this->get_key($query), 'db', $this->passphrase);
 
 			if(!empty($cache['value']) && is_array($cache['value']))
 			{
@@ -152,25 +152,25 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 
 	final private function set_gravitate_cache($query=false, $results=false)
 	{
-		if(!GRAVITATE_CACHE::can_cache())
+		if(!GRAV_CACHE::can_cache())
 		{
 			return false;
 		}
 
-		if(defined('WP_ADMIN') && GRAVITATE_CACHE::is_enabled('exclude_wp_admin', 'excludes'))
+		if(defined('WP_ADMIN') && GRAV_CACHE::is_enabled('exclude_wp_admin', 'excludes'))
 		{
 			return false;
 		}
 
-		if(GRAVITATE_CACHE::get_user_logged_in_cookie() && GRAVITATE_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
+		if(GRAV_CACHE::get_user_logged_in_cookie() && GRAV_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
 		{
 			return false;
 		}
 
-		if(class_exists('GRAVITATE_CACHE') && $query && $results !== false && GRAVITATE_CACHE::is_enabled('database'))
+		if(class_exists('GRAV_CACHE') && $query && $results !== false && GRAV_CACHE::is_enabled('database'))
 		{
 			$cache_results = array('results'=>$results,'last_result'=>$this->last_result,'num_rows'=>$this->num_rows);
-			return GRAVITATE_CACHE::set($this->get_key($query), $cache_results, false, 'db', $this->passphrase);
+			return GRAV_CACHE::set($this->get_key($query), $cache_results, false, 'db', $this->passphrase);
 		}
 
 		return false;
@@ -247,12 +247,12 @@ class GRAVITATE_CACHE_WPDB extends wpdb
 		$results = parent::query($query);
 
 		// write operations may need to invalidate the cache
-		if(class_exists('GRAVITATE_CACHE_INIT') && !$this->gravitate_cache_is_query_ignored($query) && $results && preg_match( '/^\s*(create|alter|truncate|drop|insert|delete|update|replace)\s/i', $query))
+		if(class_exists('GRAV_CACHE_INIT') && !$this->gravitate_cache_is_query_ignored($query) && $results && preg_match( '/^\s*(create|alter|truncate|drop|insert|delete|update|replace)\s/i', $query))
 		{
 			preg_match_all('/('.$this->prefix.'[^(\s|\.]+)/', $query, $tables);
 			if(!empty($tables[1]))
 			{
-				GRAVITATE_CACHE::clear('/db\:\:.*('.str_replace("`", "", implode('|',$tables[1])).')/');
+				GRAV_CACHE::clear('/db\:\:.*('.str_replace("`", "", implode('|',$tables[1])).')/');
 			}
 		}
 

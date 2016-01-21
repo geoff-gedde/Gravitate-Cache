@@ -1,9 +1,14 @@
 <?php
 
-// ini_set('error_reporting', E_ALL);
-// ini_set('display_errors', 1);
-
-class GRAVITATE_CACHE {
+/**
+ * Main Grav Cache Controller
+ *
+ * Responsible for managing cache requests between the drivers.
+ *
+ * @createdby Gravitate
+ *
+ */
+class GRAV_CACHE {
 
 	private static $mcache;
 	private static $no_cache_reason = '';
@@ -13,10 +18,12 @@ class GRAVITATE_CACHE {
 	public static $driver = false;
 	public static $drivers = array('redis','memcached','memcache','disk');
 
+
+
 	/**
+	 * Initializes the Cache and connects to the Driver
 	 *
-	 *
-	 *
+	 * @return void
 	 */
 	public static function init()
 	{
@@ -28,7 +35,7 @@ class GRAVITATE_CACHE {
 
 			foreach (self::$drivers as $driver)
 			{
-				$driver_class = 'GRAVITATE_CACHE_DRIVER_'.strtoupper($driver);
+				$driver_class = 'GRAV_CACHE_DRIVER_'.strtoupper($driver);
 				include_once(dirname(dirname(__FILE__)).'/drivers/'.$driver.'.class.php');
 				$driver_obj = new $driver_class(self::$settings);
 				if($driver_obj->init())
@@ -41,10 +48,16 @@ class GRAVITATE_CACHE {
 		}
 	}
 
+
+
 	/**
+	 * Grabs the Settings for the Cache from the cached file.
 	 *
+	 * Settings need to be saved in a file as the Advanced
+	 * Cache doe not have access to wpdb as it is
+	 * called before wpdb is initialized
 	 *
-	 *
+	 * @return void
 	 */
 	public static function get_settings()
 	{
@@ -65,7 +78,7 @@ class GRAVITATE_CACHE {
 				{
 					foreach ($grav_cache_settings as $key => $value)
 					{
-						$def = str_replace('-', '_', strtoupper('GRAVITATE_CACHE_CONFIG_'.$key));
+						$def = str_replace('-', '_', strtoupper('GRAV_CACHE_CONFIG_'.$key));
 						if(defined($def))
 						{
 							$grav_cache_settings[$key] = constant($def);
@@ -76,7 +89,7 @@ class GRAVITATE_CACHE {
 
 					self::$settings['debug'] = false;
 
-					if(defined('GRAVITATE_CACHE_DEBUG') && GRAVITATE_CACHE_DEBUG)
+					if(defined('GRAV_CACHE_DEBUG') && GRAV_CACHE_DEBUG)
 					{
 						self::$settings['debug'] = true;
 					}
@@ -85,10 +98,16 @@ class GRAVITATE_CACHE {
 		}
 	}
 
+
+
 	/**
+	 * Gets a unique id from the user if the user is loggied in
 	 *
+	 * @param boolean $with_user_info
+	 * Whether to return a logged in
+	 * or non-logged in user hash
 	 *
-	 *
+	 * @return string
 	 */
 	public static function get_userid_hash($with_user_info=true)
 	{
@@ -105,10 +124,12 @@ class GRAVITATE_CACHE {
 		return $hash;
 	}
 
+
+
 	/**
+	 * Gets the Logged in User Cookie value.
 	 *
-	 *
-	 *
+	 * @return sting
 	 */
 	public static function get_user_logged_in_cookie()
 	{
@@ -121,13 +142,16 @@ class GRAVITATE_CACHE {
 			$cookiehash = md5('http'.(!empty($_SERVER['HTTPS']) ? 's' : '').'://'.$_SERVER['HTTP_HOST']);
 		}
 
-		return (!empty($_COOKIE['wordpress_logged_in_'.$cookiehash]) ? $_COOKIE['wordpress_logged_in_'.$cookiehash] : false);
+		return (!empty($_COOKIE['wordpress_logged_in_'.$cookiehash]) ? $_COOKIE['wordpress_logged_in_'.$cookiehash] : '');
 	}
 
+
+
 	/**
+	 * Checks to see if the Page has a cache and if so echos it.
+	 * If not then do nothing.
 	 *
-	 *
-	 *
+	 * @return void
 	 */
 	public static function init_page_cache()
 	{
@@ -141,22 +165,41 @@ class GRAVITATE_CACHE {
 				{
 					echo "\n<!-- Gravitate Cache - Database Cache not needed when using Page Cache -->";
 				}
-				self::details();
+				if(self::is_enabled('object'))
+				{
+					echo "\n<!-- Gravitate Cache - Object Cache not needed when using Page Cache -->";
+				}
+				self::details(true);
 				exit;
 			}
 		}
 	}
 
+
+
+	/**
+	 * Returns a site key to make sure that the site have unique keys
+	 *
+	 * @param string $key
+	 *
+	 * @return string
+	 */
 	public static function site_key($key='')
 	{
 		$domain = (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '');
 		return $domain.'::'.trim($key);
 	}
 
+
+
 	/**
+	 * Returns a unique page key based on user and url.
 	 *
+	 * We need to return different keys for users as
+	 * pages may contain different content
+	 * based on the user.
 	 *
-	 *
+	 * @return string
 	 */
 	public static function get_page_key($url='', $logged_in=true)
 	{
@@ -164,12 +207,14 @@ class GRAVITATE_CACHE {
 		return 'page::uid'.self::get_userid_hash($logged_in).'::'.$url;
 	}
 
+
+
 	/**
+	 * Generates the details about the cache.
 	 *
-	 *
-	 *
+	 * @return string
 	 */
-	public static function details()
+	public static function details($is_page_cached=false)
 	{
 		global $wpdb, $table_prefix;
 
@@ -188,7 +233,7 @@ class GRAVITATE_CACHE {
 			}
 		}
 
-		if(self::is_enabled('page') && self::can_page_cache())
+		if(!$is_page_cached && self::is_enabled('page') && self::can_page_cache())
 		{
 			$output.= "\n<!-- Gravitate Cache - Page Not Cached - Not Cached Yet. Try Reloading -->";
 		}
@@ -261,9 +306,9 @@ class GRAVITATE_CACHE {
 			$output.= " -->";
 		}
 
-		if(defined('GRAVITATE_CACHE_TIMESTART') && GRAVITATE_CACHE_TIMESTART)
+		if(defined('GRAV_CACHE_TIMESTART') && GRAV_CACHE_TIMESTART)
 		{
-			$output.= "\n<!-- Gravitate Cache - DEBUG: Server Execution Time was ".sprintf("%01.6f", (microtime(true)-GRAVITATE_CACHE_TIMESTART))." Seconds -->";
+			$output.= "\n<!-- Gravitate Cache - Server Execution Time was ".sprintf("%01.6f", (microtime(true)-GRAV_CACHE_TIMESTART))." Seconds -->";
 		}
 
 
@@ -271,6 +316,7 @@ class GRAVITATE_CACHE {
 
 		return $output;
 	}
+
 
 
 	/**
@@ -350,6 +396,8 @@ class GRAVITATE_CACHE {
 		return true;
 	}
 
+
+
 	/**
 	 *
 	 *
@@ -376,7 +424,7 @@ class GRAVITATE_CACHE {
 
 		if(function_exists('is_user_logged_in'))
 		{
-			if(is_user_logged_in() && GRAVITATE_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
+			if(is_user_logged_in() && self::is_enabled('exclude_wp_logged_in', 'excludes'))
 			{
 				self::$no_cache_reason = 'User Logged In Excluded';
 				return false;
@@ -386,7 +434,7 @@ class GRAVITATE_CACHE {
 		{
 		    foreach($_COOKIE as $key => $val)
 		    {
-		        if(substr($key, 0, 19) === "wordpress_logged_in" && GRAVITATE_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
+		        if(substr($key, 0, 19) === "wordpress_logged_in" && self::is_enabled('exclude_wp_logged_in', 'excludes'))
 		        {
 		            self::$no_cache_reason = 'User Logged In Excluded';
 					return false;
@@ -441,6 +489,8 @@ class GRAVITATE_CACHE {
 		return false;
 	}
 
+
+
 	/**
 	 *
 	 *
@@ -455,6 +505,8 @@ class GRAVITATE_CACHE {
 		return false;
 	}
 
+
+
 	/**
 	 *
 	 *
@@ -464,11 +516,48 @@ class GRAVITATE_CACHE {
 	{
 		if(self::$driver)
 		{
-			//self::$driver->flush();
 			return self::$driver->clear($regex);
 		}
 		return false;
 	}
+
+
+
+	/**
+	 *
+	 *
+	 *
+	 */
+	public static function clear_pages()
+	{
+		return self::clear('/page\:\:/');
+	}
+
+
+
+	/**
+	 *
+	 *
+	 *
+	 */
+	public static function clear_db()
+	{
+		return self::clear('/db\:\:/');
+	}
+
+
+
+	/**
+	 *
+	 *
+	 *
+	 */
+	public static function clear_object()
+	{
+		return self::clear('/object\:\:/');
+	}
+
+
 
 	/**
 	 *
@@ -482,6 +571,8 @@ class GRAVITATE_CACHE {
 			return self::$driver->delete($key, $group);
 		}
 	}
+
+
 
 	/**
 	 *
@@ -517,6 +608,8 @@ class GRAVITATE_CACHE {
 
 		return false;
 	}
+
+
 
 	/**
 	 *
@@ -597,6 +690,8 @@ class GRAVITATE_CACHE {
 		return $value;
 	}
 
+
+
 	/**
 	 *
 	 *
@@ -660,6 +755,8 @@ class GRAVITATE_CACHE {
 		return self::$driver->set($key, $value, $expires=0, $group);
 	}
 
+
+
 	/**
 	 *
 	 *
@@ -675,6 +772,8 @@ class GRAVITATE_CACHE {
 		return $values;
 	}
 
+
+
 	/**
 	 *
 	 *
@@ -689,6 +788,8 @@ class GRAVITATE_CACHE {
 		return true;
 	}
 
+
+
 	/**
 	 *
 	 *
@@ -700,6 +801,8 @@ class GRAVITATE_CACHE {
 
 		return false;
 	}
+
+
 
 	/**
 	 *
@@ -714,5 +817,5 @@ class GRAVITATE_CACHE {
 	}
 }
 
-GRAVITATE_CACHE::init();
+GRAV_CACHE::init();
 

@@ -14,52 +14,53 @@ if ( !function_exists( 'add_action' ) ) {
 	exit;
 }
 
-register_activation_hook(__FILE__, array( 'GRAVITATE_CACHE_INIT', 'activate'));
-register_deactivation_hook(__FILE__, array( 'GRAVITATE_CACHE_INIT', 'deactivate'));
-add_action('admin_menu', array( 'GRAVITATE_CACHE_INIT', 'admin_menu'));
-add_action('updated_option', array( 'GRAVITATE_CACHE_INIT', 'updated_option'));
-add_action('admin_bar_menu', array( 'GRAVITATE_CACHE_INIT', 'admin_bar_menu'), 999);
-add_action('init', array( 'GRAVITATE_CACHE_INIT', 'start_cache'));
+register_activation_hook(__FILE__, array( 'GRAV_CACHE_INIT', 'activate'));
+register_deactivation_hook(__FILE__, array( 'GRAV_CACHE_INIT', 'deactivate'));
+add_action('admin_menu', array( 'GRAV_CACHE_INIT', 'admin_menu'));
+add_action('updated_option', array( 'GRAV_CACHE_INIT', 'updated_option'));
+add_action('admin_bar_menu', array( 'GRAV_CACHE_INIT', 'admin_bar_menu'), 999);
+add_action('init', array( 'GRAV_CACHE_INIT', 'start_cache'));
 
-add_action('admin_head', array('GRAVITATE_CACHE_INIT', 'wp_head'));
-add_action('wp_head', array('GRAVITATE_CACHE_INIT', 'wp_head'));
+add_action('admin_head', array('GRAV_CACHE_INIT', 'wp_head'));
+add_action('wp_head', array('GRAV_CACHE_INIT', 'wp_head'));
 
-add_action('wp_ajax_gravitate_clear_cache', array( 'GRAVITATE_CACHE_INIT', 'ajax_clear_cache'));
-add_action('wp_ajax_gravitate_flush_cache', array( 'GRAVITATE_CACHE_INIT', 'ajax_flush_cache'));
-add_action('wp_ajax_gravitate_clear_post_cache', array( 'GRAVITATE_CACHE_INIT', 'ajax_clear_post_cache'));
+add_action('wp_ajax_gravitate_clear_cache', array( 'GRAV_CACHE_INIT', 'ajax_clear_cache'));
+add_action('wp_ajax_gravitate_flush_cache', array( 'GRAV_CACHE_INIT', 'ajax_flush_cache'));
+add_action('wp_ajax_gravitate_clear_post_cache', array( 'GRAV_CACHE_INIT', 'ajax_clear_post_cache'));
 
-add_filter('plugin_action_links_'.plugin_basename(__FILE__), array('GRAVITATE_CACHE_INIT', 'plugin_settings_link'));
+add_filter('plugin_action_links_'.plugin_basename(__FILE__), array('GRAV_CACHE_INIT', 'plugin_settings_link'));
 
 // Clear Cache on Certain hooks
-add_action('save_post', array( 'GRAVITATE_CACHE_INIT', 'update_post' ));
-// add_action('create_category', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('add_attachment', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('delete_attachment', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('delete_category', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('trashed_post', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('untrashed_post', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('deleted_post', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('edit_attachment', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('edit_category', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('updated_postmeta', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('comment_post', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('edit_comment', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('deleted_comment', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('trashed_comment', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('comment_closed', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('profile_update', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('user_register', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-// add_action('delete_user', array( 'GRAVITATE_CACHE_INIT', 'clear_and_load' ));
-add_action('updated_option', array( 'GRAVITATE_CACHE_INIT', 'updated_option' ));
+add_action('wp_insert_post_data', array( 'GRAV_CACHE_INIT', 'pre_update_post' ));
+add_action('save_post', array( 'GRAV_CACHE_INIT', 'update_post' ));
+// add_action('create_category', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('add_attachment', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('delete_attachment', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('delete_category', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('trashed_post', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('untrashed_post', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('deleted_post', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('edit_attachment', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('edit_category', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('updated_postmeta', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('comment_post', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('edit_comment', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('deleted_comment', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('trashed_comment', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('comment_closed', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('profile_update', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('user_register', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+// add_action('delete_user', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
+add_action('updated_option', array( 'GRAV_CACHE_INIT', 'updated_option' ));
 
-add_action( 'plugins_loaded', array('GRAVITATE_CACHE_INIT', 'clear_plugins_cache') );
-add_action( 'upgrader_process_complete', array('GRAVITATE_CACHE_INIT', 'clear_and_load'), 10, 0 );
+add_action( 'plugins_loaded', array('GRAV_CACHE_INIT', 'clear_plugins_cache') );
+add_action( 'upgrader_process_complete', array('GRAV_CACHE_INIT', 'clear_and_load'), 10, 0 );
 
 
 include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-cache-class.php');
 
 
-class GRAVITATE_CACHE_INIT {
+class GRAV_CACHE_INIT {
 
 	private static $version = '0.9.0';
 	private static $settings = array();
@@ -81,7 +82,7 @@ class GRAVITATE_CACHE_INIT {
 
 		if(defined('WP_CONTENT_DIR'))
 		{
-			if(GRAVITATE_CACHE::is_enabled('page') || GRAVITATE_CACHE::is_enabled('object') || GRAVITATE_CACHE::is_enabled('database'))
+			if(GRAV_CACHE::is_enabled('page') || GRAV_CACHE::is_enabled('object') || GRAV_CACHE::is_enabled('database'))
 			{
 				self::add_wp_cache();
 			}
@@ -155,11 +156,11 @@ class GRAVITATE_CACHE_INIT {
 				}
 
 
-				if($config_data && !strpos($config_data, 'GRAVITATE_CACHE_TIMESTART'))
+				if($config_data && !strpos($config_data, 'GRAV_CACHE_TIMESTART'))
 				{
 					$config_data = preg_replace(
 		            '~<\?(php)?~',
-		            "\\0\r\n" . "define('GRAVITATE_CACHE_TIMESTART', microtime(true)); // Added by Gravitate Cache\r\n",
+		            "\\0\r\n" . "define('GRAV_CACHE_TIMESTART', microtime(true)); // Added by Gravitate Cache\r\n",
 		            $config_data,
 		            1);
 
@@ -244,9 +245,9 @@ class GRAVITATE_CACHE_INIT {
 
 		self::get_settings(true);
 
-		if(is_plugin_active('gravitate-cache/gravitate-cache.php') && class_exists('GRAVITATE_CACHE'))
+		if(is_plugin_active('gravitate-cache/gravitate-cache.php') && class_exists('GRAV_CACHE'))
 		{
-			if(GRAVITATE_CACHE::can_page_cache())
+			if(GRAV_CACHE::can_page_cache())
 			{
 				ob_start(array(__CLASS__, 'page_buffer_cache'));
 			}
@@ -258,7 +259,7 @@ class GRAVITATE_CACHE_INIT {
 				   !defined('XMLRPC_REQUEST') &&
 				   (!defined('SHORTINIT') || (defined('SHORTINIT') && !SHORTINIT) ))
 				{
-					add_action('shutdown', array('GRAVITATE_CACHE_INIT', 'shutdown'));
+					add_action('shutdown', array('GRAV_CACHE_INIT', 'shutdown'));
 				}
 			}
 		}
@@ -266,7 +267,7 @@ class GRAVITATE_CACHE_INIT {
 
 	static function page_buffer_cache($buffer)
 	{
-		if(GRAVITATE_CACHE::can_page_cache())
+		if(GRAV_CACHE::can_page_cache())
 		{
 			// Minify
 			/*
@@ -277,7 +278,7 @@ class GRAVITATE_CACHE_INIT {
 			*/
 
 			// $buffer
-			GRAVITATE_CACHE::set(GRAVITATE_CACHE::get_page_key(), $buffer, 0, 'page');
+			GRAV_CACHE::set(GRAV_CACHE::get_page_key(), $buffer, 0, 'page');
 		}
 
 		return $buffer.self::shutdown();
@@ -285,7 +286,7 @@ class GRAVITATE_CACHE_INIT {
 
 	static function shutdown()
 	{
-		return GRAVITATE_CACHE::details();
+		return GRAV_CACHE::details();
 	}
 
 	static function clear_and_load()
@@ -295,16 +296,16 @@ class GRAVITATE_CACHE_INIT {
 		self::pre_load_pages();
 	}
 
-	static function clear_post($post_id=0, $reset=false)
+	static function clear_post($post_id=0, $pre_load_pages=false)
 	{
 		if($post_id && get_post_type($post_id) !== 'revision')
 		{
 			if($post_url = get_permalink($post_id))
 			{
 				self::clear_url($post_url);
-				GRAVITATE_CACHE::clear('/page\:\:.*post\.php(.+)'.$post_id.'/');
-				GRAVITATE_CACHE::clear('/page\:\:.*edit\.php(.+)post_type\='.get_post_type($post_id).'/');
-				if($reset)
+				GRAV_CACHE::clear('/page\:\:.*post\.php(.+)'.$post_id.'/');
+				GRAV_CACHE::clear('/page\:\:.*edit\.php(.+)post_type\='.get_post_type($post_id).'/');
+				if($pre_load_pages)
 				{
 					self::pre_load_page($post_url);
 
@@ -325,15 +326,29 @@ class GRAVITATE_CACHE_INIT {
 		return true;
 	}
 
+	static function pre_update_post($data=array())
+	{
+		if(!empty($data['post_title']) && !empty($_POST['ID']))
+		{
+			$old_post_title = get_the_title($_POST['ID']);
+			if($data['post_title'] !== $old_post_title)
+			{
+				set_transient( 'grav_cache_changed_title_post_id_'.$_POST['ID'], $old_post_title, 20 );
+			}
+		}
+
+		return $data;
+	}
+
 	static function update_post($post_id=0)
 	{
-		//self::clear_post($post_id, true);
+		// Nothing for now
 	}
 
 	static function clear_plugins_cache($param1='', $param2='')
 	{
-		GRAVITATE_CACHE::clear('/plugins\.php/');
-		GRAVITATE_CACHE::clear('/update-core\.php/');
+		GRAV_CACHE::clear('/plugins\.php/');
+		GRAV_CACHE::clear('/update-core\.php/');
 	}
 
 	static function clear_url($url)
@@ -346,14 +361,14 @@ class GRAVITATE_CACHE_INIT {
 				$url = substr($url, strpos($url, '/'));
 			}
 		}
-		self::delete(GRAVITATE_CACHE::get_page_key($url), true);
-		self::delete(GRAVITATE_CACHE::get_page_key($url, false), true);
+		self::delete(GRAV_CACHE::get_page_key($url), true);
+		self::delete(GRAV_CACHE::get_page_key($url, false), true);
 		return true;
 	}
 
 	static function delete($key)
 	{
-		return GRAVITATE_CACHE::delete($key);
+		return GRAV_CACHE::delete($key);
 	}
 
 	static function ajax_clear_cache()
@@ -375,7 +390,7 @@ class GRAVITATE_CACHE_INIT {
 		if(is_user_logged_in() && current_user_can('manage_options'))
 		{
 			self::get_settings();
-			GRAVITATE_CACHE::flush();
+			GRAV_CACHE::flush();
 			self::pre_load_pages();
 			echo 'Cached has been Cleared Successfully!';
 		}
@@ -392,8 +407,11 @@ class GRAVITATE_CACHE_INIT {
 		{
 			self::clear_post($_POST['post_id'], true);
 
-			// print_r($_SERVER);
-			// print_r($headers);
+			if(!empty($_POST['title_changed']))
+			{
+				GRAV_CACHE::clear_pages();
+				self::pre_load_pages();
+			}
 		}
 		else
 		{
@@ -415,13 +433,63 @@ class GRAVITATE_CACHE_INIT {
 		if(!empty($_POST))
 		{
 			self::clear_and_load();
-			//file_put_contents(WP_CONTENT_DIR.'/data-grav.txt', date("dS g:i:sa")." - Updated Option \n\r", FILE_APPEND);
 		}
 	}
 
 	private static function clear_all_cache()
 	{
-		GRAVITATE_CACHE::clear();
+		GRAV_CACHE::clear();
+	}
+
+	private static function get_pages_in_menus()
+	{
+		$menu_page_urls = array();
+
+		if($menus = get_registered_nav_menus())
+		{
+			foreach ($menus as $menu => $title)
+			{
+				$locations = get_nav_menu_locations();
+
+				if(isset($locations[ $menu ]))
+				{
+					$menu = wp_get_nav_menu_object( $locations[ $menu ] );
+
+					if(!empty($menu->term_id))
+					{
+						if($items = wp_get_nav_menu_items( $menu->term_id ))
+						{
+							foreach ($items as $item)
+							{
+								if(strpos($item->url, site_url()) !== false)
+								{
+									$menu_page_urls[] = $item->url;
+								}
+							}
+						}
+					}
+				}
+
+				if(empty($items))
+				{
+					$menu = wp_page_menu( array('echo' => false) );
+					preg_match_all('/href\=\"([^"]*)\"/s', $menu, $matches);
+
+					if(!empty($matches[1]))
+					{
+						foreach ($matches[1] as $url)
+						{
+							if(strpos($url, site_url()) !== false)
+							{
+								$menu_page_urls[] = $url;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return $menu_page_urls;
 	}
 
 	private static function pre_load_pages()
@@ -435,48 +503,7 @@ class GRAVITATE_CACHE_INIT {
 			// Preload Menu Links
 			if(self::$settings['preload_urls'] === 'menus')
 			{
-				if($menus = get_registered_nav_menus())
-				{
-					foreach ($menus as $menu => $title)
-					{
-						$locations = get_nav_menu_locations();
-
-						if(isset($locations[ $menu ]))
-						{
-							$menu = wp_get_nav_menu_object( $locations[ $menu ] );
-
-							if(!empty($menu->term_id))
-							{
-								$items = wp_get_nav_menu_items( $menu->term_id );
-
-								if(!empty($items))
-								{
-									foreach ($items as $item)
-									{
-										if(strpos($item->url, site_url()) !== false)
-										{
-											$pre_load_pages[] = $item->url;
-										}
-									}
-								}
-							}
-						}
-
-						if(empty($items))
-						{
-							$menu = wp_page_menu( array('echo' => false) );
-							preg_match_all('/href\=\"([^"]*)\"/s', $menu, $matches);
-
-							if(!empty($matches[1]))
-							{
-								foreach ($matches[1] as $url)
-								{
-									$pre_load_pages[] = $url;
-								}
-							}
-						}
-					}
-				}
+				$pre_load_pages = array_merge($pre_load_pages, self::get_pages_in_menus());
 			}
 
 			// Preload All Pages
@@ -491,7 +518,7 @@ class GRAVITATE_CACHE_INIT {
 				}
 			}
 
-			if(is_user_logged_in() && !GRAVITATE_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
+			if(is_user_logged_in() && !GRAV_CACHE::is_enabled('exclude_wp_logged_in', 'excludes'))
 			{
 				$pre_load_pages[] = admin_url('index.php');
 				$pre_load_pages[] = admin_url('edit.php');
@@ -512,7 +539,6 @@ class GRAVITATE_CACHE_INIT {
 
 		if(!empty($pre_load_pages))
 		{
-
 			foreach (array_unique($pre_load_pages) as $page_url)
 			{
 				self::pre_load_page($page_url);
@@ -677,11 +703,12 @@ class GRAVITATE_CACHE_INIT {
 					return false;
 				}
 
-				function grav_cache_clear_post(post_id)
+				function grav_cache_clear_post(post_id, title_changed)
 				{
 					var data = {
 						'action': 'gravitate_clear_post_cache',
-						'post_id': post_id
+						'post_id': post_id,
+						'title_changed': title_changed
 					};
 
 					jQuery.post('<?php echo admin_url('admin-ajax.php');?>', data, function(response)
@@ -696,8 +723,15 @@ class GRAVITATE_CACHE_INIT {
 
 				<?php if(!empty($_REQUEST['post']) && !empty($_REQUEST['action']) && $_REQUEST['action'] === 'edit' && !empty($_REQUEST['message']))
 				{
+					$old_post_title = get_transient('grav_cache_changed_title_post_id_'.$_REQUEST['post']);
+
+					if($old_post_title)
+					{
+						delete_transient('grav_cache_changed_title_post_id_'.$_REQUEST['post']);
+					}
+
 					?>
-					grav_cache_clear_post(<?php echo $_REQUEST['post'];?>);
+					grav_cache_clear_post(<?php echo $_REQUEST['post'];?>, <?php echo ($old_post_title ? '1' : '0');?>);
 					<?php
 				}
 				?>
@@ -705,13 +739,6 @@ class GRAVITATE_CACHE_INIT {
 			</script>
 
 			<style>
-
-				/*.cssload-container {
-					width: 20px;
-					height: 10px;
-					text-align: center;
-					display: inline-block;
-				}*/
 
 				#wp-admin-bar-gravitate_cache .ab-sub-wrapper {
 					padding-right: 20px !important;
@@ -737,8 +764,6 @@ class GRAVITATE_CACHE_INIT {
 						-webkit-animation: grav-cache-cssload-spin 1320ms infinite linear;
 						-moz-animation: grav-cache-cssload-spin 1320ms infinite linear;
 				}
-
-
 
 				@keyframes grav-cache-cssload-spin {
 					100%{ transform: rotate(360deg); transform: rotate(360deg); }
@@ -874,7 +899,7 @@ class GRAVITATE_CACHE_INIT {
 			return;
 		}
 
-		$file_settings = GRAVITATE_CACHE::get_settings();
+		$file_settings = GRAV_CACHE::get_settings();
 
 		self::$settings = $file_settings;
 	}
@@ -884,7 +909,7 @@ class GRAVITATE_CACHE_INIT {
 		// Get Settings
 		self::get_settings(true);
 
-		if(defined('GRAVITATE_CACHE_LOCK_SETTINGS') && GRAVITATE_CACHE_LOCK_SETTINGS == true)
+		if(defined('GRAV_CACHE_LOCK_SETTINGS') && GRAV_CACHE_LOCK_SETTINGS == true)
 		{
 			$error = 'The Settings have been locked.  Please see your Web Developer.  This is most likely intensional as they don\'t want you to mess with the settings :)';
 		}
@@ -910,7 +935,7 @@ class GRAVITATE_CACHE_INIT {
 				self::add_grav_cache_settings_file();
 
 				// Update CACHE Class Settings
-				GRAVITATE_CACHE::get_settings();
+				GRAV_CACHE::get_settings();
 			}
 		}
 
@@ -928,7 +953,7 @@ class GRAVITATE_CACHE_INIT {
 		// Save Config
 		if(!empty($_POST['save_grav_settings']))
 		{
-			if(GRAVITATE_CACHE::is_enabled('browser'))
+			if(GRAV_CACHE::is_enabled('browser'))
 			{
 				$htaccess_file = ABSPATH.'.htaccess';
 				if(file_exists($htaccess_file))
@@ -951,7 +976,7 @@ class GRAVITATE_CACHE_INIT {
 				self::disable_browser_cache();
 			}
 
-			if(GRAVITATE_CACHE::is_enabled('page'))
+			if(GRAV_CACHE::is_enabled('page'))
 			{
 				if(defined('WP_CONTENT_DIR'))
 				{
@@ -966,7 +991,7 @@ class GRAVITATE_CACHE_INIT {
 				self::disable_page_cache();
 			}
 
-			if(GRAVITATE_CACHE::is_enabled('database'))
+			if(GRAV_CACHE::is_enabled('database'))
 			{
 				if(defined('WP_CONTENT_DIR'))
 				{
@@ -981,7 +1006,7 @@ class GRAVITATE_CACHE_INIT {
 				self::disable_db_cache();
 			}
 
-			if(GRAVITATE_CACHE::is_enabled('object'))
+			if(GRAV_CACHE::is_enabled('object'))
 			{
 				if(defined('WP_CONTENT_DIR'))
 				{
@@ -996,7 +1021,7 @@ class GRAVITATE_CACHE_INIT {
 				self::disable_object_cache();
 			}
 
-			if(GRAVITATE_CACHE::is_enabled('page') || GRAVITATE_CACHE::is_enabled('object') || GRAVITATE_CACHE::is_enabled('database'))
+			if(GRAV_CACHE::is_enabled('page') || GRAV_CACHE::is_enabled('object') || GRAV_CACHE::is_enabled('database'))
 			{
 				self::add_wp_cache();
 			}
@@ -1018,7 +1043,7 @@ class GRAVITATE_CACHE_INIT {
 
 		$section = (!empty($_GET['section']) ? $_GET['section'] : 'settings');
 
-		if(!defined('GRAVITATE_CACHE_LOCK_SETTINGS') || (defined('GRAVITATE_CACHE_LOCK_SETTINGS') && GRAVITATE_CACHE_LOCK_SETTINGS == false))
+		if(!defined('GRAV_CACHE_LOCK_SETTINGS') || (defined('GRAV_CACHE_LOCK_SETTINGS') && GRAV_CACHE_LOCK_SETTINGS == false))
 		{
 			switch($section)
 			{

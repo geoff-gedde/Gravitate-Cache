@@ -1,6 +1,6 @@
 <?php
 
-class GRAVITATE_CACHE_DRIVER_MEMCACHE extends GRAVITATE_CACHE_DRIVER {
+class GRAV_CACHE_DRIVER_MEMCACHE extends GRAV_CACHE_DRIVER {
 
 	private $connection;
 	private $config;

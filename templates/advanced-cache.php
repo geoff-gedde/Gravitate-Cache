@@ -8,9 +8,9 @@ if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/plugins/gravitate-c
 {
 	include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-cache-class.php');
 
-	if(class_exists('GRAVITATE_CACHE'))
+	if(class_exists('GRAV_CACHE'))
 	{
-		GRAVITATE_CACHE::init_page_cache();
+		GRAV_CACHE::init_page_cache();
 	}
 }
 

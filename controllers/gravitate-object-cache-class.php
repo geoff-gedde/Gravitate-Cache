@@ -491,18 +491,18 @@ class WP_Object_Cache {
 		if ( ! is_numeric( $this->cache[ $group ][ $key ] ) )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAVITATE_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
 		}
 
 		$offset = (int) $offset;
 
 		$this->cache[ $group ][ $key ] -= $offset;
-		GRAVITATE_CACHE::decrement('object::'.$key, $offset, $group);
+		GRAV_CACHE::decrement('object::'.$key, $offset, $group);
 
 		if ( $this->cache[ $group ][ $key ] < 0 )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAVITATE_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
 		}
 
 		return $this->cache[ $group ][ $key ];
@@ -528,7 +528,7 @@ class WP_Object_Cache {
 		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) )
 			$key = $this->blog_prefix . $key;
 
-		GRAVITATE_CACHE::delete('object::'.$key, $group);
+		GRAV_CACHE::delete('object::'.$key, $group);
 
 		if ( ! $this->_exists( $key, $group ) )
 			return false;
@@ -547,7 +547,7 @@ class WP_Object_Cache {
 	 */
 	public function flush() {
 		$this->cache = array();
-		GRAVITATE_CACHE::clear('/object\:\:/');
+		GRAV_CACHE::clear('/object\:\:/');
 		return true;
 	}
 
@@ -587,9 +587,9 @@ class WP_Object_Cache {
 			else
 				return $this->cache[$group][$key];
 		}
-		else if(!is_numeric($key) && GRAVITATE_CACHE::can_cache())
+		else if(!is_numeric($key) && GRAV_CACHE::can_cache())
 		{
-			if($grav_cache = GRAVITATE_CACHE::get('object::'.$key, $group))
+			if($grav_cache = GRAV_CACHE::get('object::'.$key, $group))
 			{
 				$found = true;
 				$this->cache_hits += 1;
@@ -638,18 +638,18 @@ class WP_Object_Cache {
 		if ( ! is_numeric( $this->cache[ $group ][ $key ] ) )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAVITATE_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
 		}
 
 		$offset = (int) $offset;
 
 		$this->cache[ $group ][ $key ] += $offset;
-		GRAVITATE_CACHE::increment('object::'.$key, $offset, $group);
+		GRAV_CACHE::increment('object::'.$key, $offset, $group);
 
 		if ( $this->cache[ $group ][ $key ] < 0 )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAVITATE_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
 		}
 
 		return $this->cache[ $group ][ $key ];
@@ -734,9 +734,9 @@ class WP_Object_Cache {
 			$data = clone $data;
 
 		$this->cache[$group][$key] = $data;
-		if(!is_numeric($key) && GRAVITATE_CACHE::can_cache())
+		if(!is_numeric($key) && GRAV_CACHE::can_cache())
 		{
-			GRAVITATE_CACHE::set('object::'.$key, $data, $expire, $group);
+			GRAV_CACHE::set('object::'.$key, $data, $expire, $group);
 		}
 		return true;
 	}

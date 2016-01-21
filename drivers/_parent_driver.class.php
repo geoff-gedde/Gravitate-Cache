@@ -1,6 +1,6 @@
 <?php
 
-class GRAVITATE_CACHE_DRIVER {
+class GRAV_CACHE_DRIVER {
 
 	private $connection;
 	private $config;
@@ -12,7 +12,7 @@ class GRAVITATE_CACHE_DRIVER {
 
 	public function key($key='')
 	{
-		return GRAVITATE_CACHE::site_key($key);
+		return GRAV_CACHE::site_key($key);
 	}
 
 	/**
@@ -24,6 +24,6 @@ class GRAVITATE_CACHE_DRIVER {
 	 */
 	public static function is_enabled($cache_type='')
 	{
-		return GRAVITATE_CACHE::is_enabled($cache_type);
+		return GRAV_CACHE::is_enabled($cache_type);
 	}
 }
