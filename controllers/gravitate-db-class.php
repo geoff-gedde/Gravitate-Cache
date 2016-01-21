@@ -135,11 +135,11 @@ class GRAV_CACHE_WPDB extends wpdb
 		{
 			$cache = GRAV_CACHE::get($this->get_key($query), 'db', $this->passphrase);
 
-			if(!empty($cache['value']) && is_array($cache['value']))
+			if(!empty($cache) && is_array($cache))
 			{
-				$results = $cache['value']['results'];
-				$this->last_result = $cache['value']['last_result'];
-				$this->num_rows = $cache['value']['num_rows'];
+				$results = $cache['results'];
+				$this->last_result = $cache['last_result'];
+				$this->num_rows = $cache['num_rows'];
 
 				$this->gravitate_cached_items[] = str_replace(array("\n","\r","\t"), '', str_replace($this->prefix, '*_', $query));
 

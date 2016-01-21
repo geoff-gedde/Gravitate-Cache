@@ -278,7 +278,7 @@ class GRAV_CACHE_INIT {
 			*/
 
 			// $buffer
-			GRAV_CACHE::set(GRAV_CACHE::get_page_key(), $buffer, 0, 'page');
+			GRAV_CACHE::set(GRAV_CACHE::get_page_key(), array('time' => time(), 'value' => $buffer), 0, 'page');
 		}
 
 		return $buffer.self::shutdown();
@@ -324,25 +324,6 @@ class GRAV_CACHE_INIT {
 			}
 		}
 		return true;
-	}
-
-	static function pre_update_post($data=array())
-	{
-		if(!empty($data['post_title']) && !empty($_POST['ID']))
-		{
-			$old_post_title = get_the_title($_POST['ID']);
-			if($data['post_title'] !== $old_post_title)
-			{
-				set_transient( 'grav_cache_changed_title_post_id_'.$_POST['ID'], $old_post_title, 20 );
-			}
-		}
-
-		return $data;
-	}
-
-	static function update_post($post_id=0)
-	{
-		// Nothing for now
 	}
 
 	static function clear_plugins_cache($param1='', $param2='')
@@ -403,12 +384,13 @@ class GRAV_CACHE_INIT {
 
 	static function ajax_clear_post_cache()
 	{
-		if(is_user_logged_in() && current_user_can('manage_options') && !empty($_POST['post_id']))
+		if(is_user_logged_in() && !empty($_POST['post_id']))
 		{
 			self::clear_post($_POST['post_id'], true);
 
-			if(!empty($_POST['title_changed']))
+			if(GRAV_CACHE::get('grav_cache_changed_title_post_id_'.$_POST['post_id']))
 			{
+				GRAV_CACHE::delete('grav_cache_changed_title_post_id_'.$_POST['post_id']);
 				GRAV_CACHE::clear_pages();
 				self::pre_load_pages();
 			}
@@ -418,6 +400,25 @@ class GRAV_CACHE_INIT {
 			echo 'Error: You Must be logged in and have the correct permissions to clear the cache.';
 		}
 		exit;
+	}
+
+	static function pre_update_post($data=array())
+	{
+		if(!empty($data['post_title']) && !empty($_POST['ID']))
+		{
+			$old_post_title = get_the_title($_POST['ID']);
+			if($data['post_title'] !== $old_post_title)
+			{
+				GRAV_CACHE::set('grav_cache_changed_title_post_id_'.$_POST['ID'], 1);
+			}
+		}
+
+		return $data;
+	}
+
+	static function update_post($post_id=0)
+	{
+		// Nothing for now
 	}
 
 	static function updated_option($option)
@@ -703,12 +704,11 @@ class GRAV_CACHE_INIT {
 					return false;
 				}
 
-				function grav_cache_clear_post(post_id, title_changed)
+				function grav_cache_clear_post(post_id)
 				{
 					var data = {
 						'action': 'gravitate_clear_post_cache',
-						'post_id': post_id,
-						'title_changed': title_changed
+						'post_id': post_id
 					};
 
 					jQuery.post('<?php echo admin_url('admin-ajax.php');?>', data, function(response)
@@ -723,15 +723,8 @@ class GRAV_CACHE_INIT {
 
 				<?php if(!empty($_REQUEST['post']) && !empty($_REQUEST['action']) && $_REQUEST['action'] === 'edit' && !empty($_REQUEST['message']))
 				{
-					$old_post_title = get_transient('grav_cache_changed_title_post_id_'.$_REQUEST['post']);
-
-					if($old_post_title)
-					{
-						delete_transient('grav_cache_changed_title_post_id_'.$_REQUEST['post']);
-					}
-
 					?>
-					grav_cache_clear_post(<?php echo $_REQUEST['post'];?>, <?php echo ($old_post_title ? '1' : '0');?>);
+					grav_cache_clear_post(<?php echo $_REQUEST['post'];?>);
 					<?php
 				}
 				?>

@@ -714,8 +714,7 @@ class GRAV_CACHE {
 
 		if(strpos($key, 'object') === false)
 		{
-
-			$value = array('time' => time(), 'value' => $value);
+			//$value = array('time' => time(), 'value' => $value);
 
 			$value = serialize($value);
 
