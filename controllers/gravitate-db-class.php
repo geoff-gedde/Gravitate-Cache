@@ -141,7 +141,7 @@ class GRAV_CACHE_WPDB extends wpdb
 				$this->last_result = $cache['last_result'];
 				$this->num_rows = $cache['num_rows'];
 
-				$this->gravitate_cached_items[] = str_replace(array("\n","\r","\t"), '', str_replace($this->prefix, '*_', $query));
+				$this->gravitate_cached_items[] = $this->clean_query_log($query);
 
 				return $results;
 			}
@@ -176,13 +176,22 @@ class GRAV_CACHE_WPDB extends wpdb
 		return false;
 	}
 
+	final private function clean_query_log($query)
+	{
+		if(!$this->gravitate_cache_settings['debug'])
+		{
+			return 0;
+		}
+		return str_replace('  ', ' ', str_replace(array("\n","\r","\t",'  '), ' ', str_replace($this->prefix, '*_', $query)));
+	}
+
 	final function get_results( $query = null, $output = OBJECT )
 	{
 		$key = 'get_results::'.$query.'_'.$output;
 		$results = $this->get_gravitate_cache($key);
 		if($results === false)
 		{
-			$this->gravitate_cache_raw_items[] = 'get_results::'.str_replace(array("\n","\r","\t"), '', str_replace($this->prefix, '*_', $query));
+			$this->gravitate_cache_raw_items[] = 'get_results::'.$this->clean_query_log($query);
 			$results = parent::get_results( $query, $output);
 			$this->set_gravitate_cache($key, $results);
 		}
@@ -195,7 +204,7 @@ class GRAV_CACHE_WPDB extends wpdb
 		$results = $this->get_gravitate_cache($key);
 		if($results === false)
 		{
-			$this->gravitate_cache_raw_items[] = 'get_row::'.str_replace(array("\n","\r","\t"), '', str_replace($this->prefix, '*_', $query));
+			$this->gravitate_cache_raw_items[] = 'get_row::'.$this->clean_query_log($query);
 			$results = parent::get_row( $query, $output, $y);
 			$this->set_gravitate_cache($key, $results);
 		}
@@ -212,7 +221,7 @@ class GRAV_CACHE_WPDB extends wpdb
 		}
 		if($results === false)
 		{
-			$this->gravitate_cache_raw_items[] = 'get_var::'.str_replace(array("\n","\r","\t"), '', str_replace($this->prefix, '*_', $query));
+			$this->gravitate_cache_raw_items[] = 'get_var::'.$this->clean_query_log($query);
 			$results = parent::get_var( $query, $x, $y);
 			$this->set_gravitate_cache($key, $results);
 		}
@@ -225,27 +234,28 @@ class GRAV_CACHE_WPDB extends wpdb
 		$results = $this->get_gravitate_cache($key);
 		if($results === false)
 		{
-			$this->gravitate_cache_raw_items[] = 'get_col::'.str_replace(array("\n","\r","\t"), '', str_replace($this->prefix, '*_', $query));
+			$this->gravitate_cache_raw_items[] = 'get_col::'.$this->clean_query_log($query);
 			$results = parent::get_col( $query, $x);
 			$this->set_gravitate_cache($key, $results);
 		}
 		return $results;
 	}
 
-	final function query( $query )
+	function check_select_query($query)
 	{
 		// Check Select
 		if(preg_match( '/^\s*(select)\s/i', $query))
 		{
 			// Not sure if we can do anything here.
-			if(!in_array('get_var::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items) && !in_array('get_row::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items) && !in_array('get_results::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items) && !in_array('get_col::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items))
+			if(preg_match( '/^\s*(select)\s/i', $query) && !in_array('get_var::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items) && !in_array('get_row::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items) && !in_array('get_results::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items) && !in_array('get_col::'.str_replace($this->prefix, '*_', $query), $this->gravitate_cache_raw_items))
 			{
-				$this->gravitate_cache_raw_items[] = 'query::'.str_replace(array("\n","\r","\t"), '', str_replace($this->prefix, '*_', $query));
+				$this->gravitate_cache_raw_items[] = 'query::'.$this->clean_query_log($query);
 			}
 		}
+	}
 
-		$results = parent::query($query);
-
+	function check_and_clear_write_query($query, $results)
+	{
 		// write operations may need to invalidate the cache
 		if(class_exists('GRAV_CACHE_INIT') && !$this->gravitate_cache_is_query_ignored($query) && $results && preg_match( '/^\s*(create|alter|truncate|drop|insert|delete|update|replace)\s/i', $query))
 		{
@@ -255,6 +265,15 @@ class GRAV_CACHE_WPDB extends wpdb
 				GRAV_CACHE::clear('/db\:\:.*('.str_replace("`", "", implode('|',$tables[1])).')/');
 			}
 		}
+	}
+
+	function query( $query )
+	{
+		$this->check_select_query($query);
+
+		$results = parent::query($query);
+
+		$this->check_and_clear_write_query($query, $results);
 
 		return $results;
 	}
@@ -264,5 +283,3 @@ if(defined('WP_CONTENT_DIR') && file_exists(WP_CONTENT_DIR.'/plugins/gravitate-c
 {
 	include_once(WP_CONTENT_DIR.'/plugins/gravitate-cache/controllers/gravitate-cache-class.php');
 }
-
-
