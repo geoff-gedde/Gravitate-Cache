@@ -12,11 +12,27 @@ class GRAV_CACHE_DRIVER_DISK extends GRAV_CACHE_DRIVER {
 
 	public function init()
 	{
-		if($this->is_enabled('database') || $this->is_enabled('page') || $this->is_enabled('object'))
+		if(defined('WP_CONTENT_DIR'))
 		{
-			if($this->config['type'] == 'auto' || $this->config['type'] == 'disk')
+			if($this->is_enabled('database') || $this->is_enabled('page') || $this->is_enabled('object'))
 			{
-				return true;
+				if($this->config['type'] == 'auto' || $this->config['type'] == 'disk')
+				{
+					if(!is_dir(WP_CONTENT_DIR.'/cache'))
+					{
+						mkdir(WP_CONTENT_DIR.'/cache');
+					}
+
+					if(!is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
+					{
+						mkdir(WP_CONTENT_DIR.'/cache/gravitate_cache');
+					}
+
+					if(is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
+					{
+						return true;
+					}
+				}
 			}
 		}
 
@@ -24,69 +40,91 @@ class GRAV_CACHE_DRIVER_DISK extends GRAV_CACHE_DRIVER {
 
 	}
 
-	public function flush()
+	public function filter_key($key='')
 	{
-		//return $this->connection->flush();
+		return preg_replace('/[^a-zA-Z0-9\-\_\.]/', '-', $key);
 	}
 
-	public function delete($key='', $group='')
+	public function flush()
 	{
 		if(defined('WP_CONTENT_DIR') && is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
 		{
-			foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache') as $file)
+			foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/*') as $file)
 			{
 				unlink($file);
 			}
+
+			return true;
 		}
 	}
 
-	public function get($key='', $group='')
+	public function delete($key='')
 	{
-		if(file_exists(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache'))
+		if(defined('WP_CONTENT_DIR') && is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
 		{
-			return file_get_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache');
+			foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/'.$this->filter_key($key).'.cache') as $file)
+			{
+				unlink($file);
+			}
+
+			return true;
+		}
+	}
+
+	public function get($key='')
+	{
+		if(file_exists(WP_CONTENT_DIR.'/cache/gravitate_cache/'.$key.'.cache'))
+		{
+			return unserialize(file_get_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.$this->filter_key($key).'.cache'));
 		}
 
 		return null;
 	}
 
-	public function set($key='', $value='', $group='')
+	public function set($key='', $value='')
 	{
-		if(!is_dir(WP_CONTENT_DIR.'/cache'))
-		{
-			mkdir(WP_CONTENT_DIR.'/cache');
-		}
-
-		if(!is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
-		{
-			mkdir(WP_CONTENT_DIR.'/cache/gravitate_cache');
-		}
-
 		if(is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
 		{
-			return file_put_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.($group ? $group.'-' : '').$key.'.cache', $value);
+			return file_put_contents(WP_CONTENT_DIR.'/cache/gravitate_cache/'.$this->filter_key($key).'.cache', serialize($value));
 		}
 	}
 
-	public function increment($key='', $value=1, $group='')
+	public function increment($key='', $value=1)
 	{
-
+		$contents = $this->get($key);
+		if($contents !== null)
+		{
+			$contents = $contents + $value;
+			$this->set($key, $contents);
+		}
 	}
 
-	public function decrement($key='', $value=1, $group='')
+	public function decrement($key='', $value=1)
 	{
-		return self::$connection->decrement($key, $value);
+		$contents = $this->get($key);
+		if($contents !== null)
+		{
+			$contents = $contents - $value;
+			$this->set($key, $contents);
+		}
 	}
 
-	public function clear($regex='')
+	public function clear($regex='/(.*)/')
 	{
 		if($regex)
 		{
-			if($keys = $this->get_all_keys($regex))
+			if(defined('WP_CONTENT_DIR') && is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
 			{
-				foreach ($keys as $key)
+				$site_key = $this->site_key();
+
+				foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/*') as $file)
 				{
-					$this->delete($key);
+					$key = str_replace('.cache', '', basename($file));
+
+					if(preg_match($regex, $key) && strpos($key, $site_key) !== false)
+					{
+						unlink($file);
+					}
 				}
 
 				return true;
@@ -96,15 +134,22 @@ class GRAV_CACHE_DRIVER_DISK extends GRAV_CACHE_DRIVER {
 		return false;
 	}
 
-	public function get_all_keys($regex='*')
+	public function get_all_keys($regex='/(.*)/')
 	{
 		$all_keys = array();
 
 		if(defined('WP_CONTENT_DIR') && is_dir(WP_CONTENT_DIR.'/cache/gravitate_cache'))
 		{
-			foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/*'.$regex.'*') as $file)
+			$site_key = $this->site_key();
+
+			foreach (glob(WP_CONTENT_DIR.'/cache/gravitate_cache/*') as $file)
 			{
-				$all_keys[] = basename($file);
+				$key = str_replace('.cache', '', basename($file));
+
+				if(preg_match($regex, $key) && strpos($key, $site_key) !== false)
+				{
+					$all_keys[] = $key;
+				}
 			}
 		}
 

@@ -122,6 +122,18 @@ class GRAV_CACHE_INIT {
 		{
 			$contents = "<?php return '".stripslashes(json_encode(self::$settings, JSON_PRETTY_PRINT | JSON_FORCE_OBJECT))."';";
 			file_put_contents(WP_CONTENT_DIR.'/cache/grav-cache-settings.php', $contents);
+
+			// Depending on the server we may need to clear the file
+			// cache so the Updated Settings can be retrieved
+			if(function_exists('clearstatcache'))
+			{
+				clearstatcache(true, WP_CONTENT_DIR.'/cache/grav-cache-settings.php');
+			}
+
+			if(function_exists('opcache_invalidate'))
+			{
+				opcache_invalidate(WP_CONTENT_DIR.'/cache/grav-cache-settings.php');
+			}
 		}
 	}
 
@@ -278,7 +290,7 @@ class GRAV_CACHE_INIT {
 			*/
 
 			// $buffer
-			GRAV_CACHE::set(GRAV_CACHE::get_page_key(), array('time' => time(), 'value' => $buffer), 0, 'page');
+			GRAV_CACHE::set(GRAV_CACHE::get_page_key(), array('time' => time(), 'value' => $buffer), 0, 'pg');
 		}
 
 		return $buffer.self::shutdown();
@@ -328,8 +340,10 @@ class GRAV_CACHE_INIT {
 
 	static function clear_plugins_cache($param1='', $param2='')
 	{
-		GRAV_CACHE::clear('/plugins\.php/');
-		GRAV_CACHE::clear('/update-core\.php/');
+		// GRAV_CACHE::clear('/plugins\.php/');
+		// GRAV_CACHE::clear('/update-core\.php/');
+
+		//GRAV_CACHE::clear_admin_pages();
 	}
 
 	static function clear_url($url)
@@ -657,13 +671,49 @@ class GRAV_CACHE_INIT {
 
 			<script>
 
+				jQuery(document).ready(function()
+				{
+					var grav_cache_type = jQuery('body.settings_page_gravitate_cache_settings .grav-plugin-settings-type #type');
+
+					if(grav_cache_type.length)
+					{
+						grav_cache_type.find('option').each(function()
+						{
+							if(jQuery(this).val() === 'apcu' && <?php echo (class_exists('APCUIterator') ? 'false' : 'true');?>)
+							{
+								jQuery(this).attr('disabled', 'disabled').html(jQuery(this).html()+' (Not Available)');
+							}
+
+							if(jQuery(this).val() === 'memcache' && <?php echo (class_exists('Memcache') ? 'false' : 'true');?>)
+							{
+								jQuery(this).attr('disabled', 'disabled').html(jQuery(this).html()+' (Not Available)');
+							}
+
+							if(jQuery(this).val() === 'memcached' && <?php echo (class_exists('Memcached') ? 'false' : 'true');?>)
+							{
+								jQuery(this).attr('disabled', 'disabled').html(jQuery(this).html()+' (Not Available)');
+							}
+
+							if(jQuery(this).val() === 'redis' && <?php echo (class_exists('Redis') ? 'false' : 'true');?>)
+							{
+								jQuery(this).attr('disabled', 'disabled').html(jQuery(this).html()+' (Not Available)');
+							}
+						});
+					}
+				});
+
 				function grav_pre_load_logged_in_page(url)
 				{
 					jQuery.get(url);
 				}
 
-				function grav_cache_clear_all_cache()
+				function grav_cache_clear_all_cache(alert_response)
 				{
+					if(typeof alert_response === 'undefined')
+					{
+						alert_response = true;
+					}
+
 					jQuery('#wp-admin-bar-gravitate_cache_clear > a').addClass('loading');
 
 					var data = {
@@ -674,7 +724,7 @@ class GRAV_CACHE_INIT {
 					{
 						jQuery('#wp-admin-bar-gravitate_cache_clear > a').removeClass('loading');
 
-						if(response)
+						if(response && alert_response)
 						{
 							alert(response);
 						}
@@ -844,10 +894,11 @@ class GRAV_CACHE_INIT {
 				$types = array(
 					'automemory' => 'Auto Detect from In Memory Only (More Secure)',
 					'auto' => 'Auto Detect the best Method from all',
-					'disk' => 'Disk (Simple and works on most Servers)',
-					'memcache' => 'In Memory - Memcache (Faster and more Secure)',
-					'memcached' => 'In Memory - MemcacheD (Modern, Faster and more Secure)',
-					'redis' => 'In Memory - Redis (Modern, Faster and more Secure)',
+					'disk' => 'Disk (Simple and works on most Servers, but less secure)',
+					'memcache' => 'In Memory - Memcache',
+					'memcached' => 'In Memory - MemcacheD',
+					'redis' => 'In Memory - Redis',
+					'apcu' => 'In Memory - APCu',
 				);
 
 				$preloads = array(
@@ -919,7 +970,6 @@ class GRAV_CACHE_INIT {
 			else if($response['success'])
 			{
 				$success = 'Settings saved successfully.';
-				self::pre_load_pages();
 
 				// Update Plugin Settings
 				self::get_settings(true);
@@ -929,6 +979,8 @@ class GRAV_CACHE_INIT {
 
 				// Update CACHE Class Settings
 				GRAV_CACHE::get_settings();
+
+				$clear_cache_and_preload_pages = true;
 			}
 		}
 
@@ -1058,7 +1110,11 @@ class GRAV_CACHE_INIT {
 		?>
 		</div>
 
-		<?php
+		<?php if(!empty($clear_cache_and_preload_pages)){ ?>
+		<script type="text/javascript">
+			grav_cache_clear_all_cache(false);
+		</script>
+		<?php }
 	}
 
 	/**

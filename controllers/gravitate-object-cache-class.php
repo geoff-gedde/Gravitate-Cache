@@ -419,6 +419,15 @@ class WP_Object_Cache {
 		unset( $this->$name );
 	}
 
+	private function group($group)
+	{
+		if(!$group)
+		{
+			$group = '';
+		}
+		return 'ob'.($group ? '__'.trim($group) : '');
+	}
+
 	/**
 	 * Adds data to the cache if it doesn't already exist.
 	 *
@@ -491,18 +500,18 @@ class WP_Object_Cache {
 		if ( ! is_numeric( $this->cache[ $group ][ $key ] ) )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set($key, 0, 0, $this->group($group));
 		}
 
 		$offset = (int) $offset;
 
 		$this->cache[ $group ][ $key ] -= $offset;
-		GRAV_CACHE::decrement('object::'.$key, $offset, $group);
+		GRAV_CACHE::decrement($key, $offset, $this->group($group));
 
 		if ( $this->cache[ $group ][ $key ] < 0 )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set($key, 0, 0, $this->group($group));
 		}
 
 		return $this->cache[ $group ][ $key ];
@@ -528,7 +537,12 @@ class WP_Object_Cache {
 		if ( $this->multisite && ! isset( $this->global_groups[ $group ] ) )
 			$key = $this->blog_prefix . $key;
 
-		GRAV_CACHE::delete('object::'.$key, $group);
+		$is_acf_get_field = ($group === 'acf' && strpos($key, 'get_field/') !== false);
+
+		if(!$is_acf_get_field)
+		{
+			GRAV_CACHE::delete($key, $this->group($group));
+		}
 
 		if ( ! $this->_exists( $key, $group ) )
 			return false;
@@ -547,7 +561,7 @@ class WP_Object_Cache {
 	 */
 	public function flush() {
 		$this->cache = array();
-		GRAV_CACHE::clear('/object\:\:/');
+		GRAV_CACHE::clear_object();
 		return true;
 	}
 
@@ -589,7 +603,9 @@ class WP_Object_Cache {
 		}
 		else if(!is_numeric($key) && GRAV_CACHE::can_cache())
 		{
-			if($grav_cache = GRAV_CACHE::get('object::'.$key, $group))
+			$grav_cache = GRAV_CACHE::get($key, $this->group($group));
+
+			if($grav_cache !== false && $grav_cache !== null)
 			{
 				$found = true;
 				$this->cache_hits += 1;
@@ -597,7 +613,12 @@ class WP_Object_Cache {
 
 				$this->cache[$group][$key] = $grav_cache;
 
-				if ( empty( $grav_cache ) || ( is_integer( $grav_cache ) && -1 == $grav_cache ) )
+				if(empty( $grav_cache ) && is_string($grav_cache))
+				{
+					return '';
+				}
+
+				if ( empty( $grav_cache ) || ( is_integer( $grav_cache ) && $grav_cache == -1 ) )
 					return false;
 
 				if ( is_object($grav_cache) )
@@ -606,11 +627,13 @@ class WP_Object_Cache {
 				else
 					return $grav_cache;
 			}
+			$this->grav_cache_misses += 1;
+			// echo "\nMIS: __ob__".$key."\n";
+			// var_dump($grav_cache);
 		}
 
 		$found = false;
 		$this->cache_misses += 1;
-		$this->grav_cache_misses += 1;
 		return false;
 	}
 
@@ -638,18 +661,18 @@ class WP_Object_Cache {
 		if ( ! is_numeric( $this->cache[ $group ][ $key ] ) )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set($key, 0, 0, $this->group($group));
 		}
 
 		$offset = (int) $offset;
 
 		$this->cache[ $group ][ $key ] += $offset;
-		GRAV_CACHE::increment('object::'.$key, $offset, $group);
+		GRAV_CACHE::increment($key, $offset, $this->group($group));
 
 		if ( $this->cache[ $group ][ $key ] < 0 )
 		{
 			$this->cache[ $group ][ $key ] = 0;
-			GRAV_CACHE::set('object::'.$key, 0, 0, $group);
+			GRAV_CACHE::set($key, 0, 0, $this->group($group));
 		}
 
 		return $this->cache[ $group ][ $key ];
@@ -736,7 +759,7 @@ class WP_Object_Cache {
 		$this->cache[$group][$key] = $data;
 		if(!is_numeric($key) && GRAV_CACHE::can_cache())
 		{
-			GRAV_CACHE::set('object::'.$key, $data, $expire, $group);
+			GRAV_CACHE::set($key, $data, $expire, $this->group($group));
 		}
 		return true;
 	}

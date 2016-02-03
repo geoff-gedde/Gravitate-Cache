@@ -14,12 +14,17 @@ class GRAV_CACHE_DRIVER_MEMCACHED extends GRAV_CACHE_DRIVER {
 	{
 		if($this->is_enabled('database') || $this->is_enabled('page') || $this->is_enabled('object'))
 		{
-			if(!empty($this->config['servers']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcached'))
+			if($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcached')
 			{
 				if(class_exists('Memcached'))
 				{
 					if($this->connection = new Memcached())
 					{
+						if(empty($this->config['servers']))
+						{
+							$this->config['servers'] = '127.0.0.1';
+						}
+
 						$added_server = false;
 
 						foreach(explode(',', $this->config['servers']) as $serverport)
@@ -49,38 +54,35 @@ class GRAV_CACHE_DRIVER_MEMCACHED extends GRAV_CACHE_DRIVER {
 		return $this->connection->flush();
 	}
 
-	public function delete($key='', $group='')
+	public function delete($key='')
 	{
-		if($all_keys = $this->get('__getAllKeys'))
+		if($all_keys = $this->get($this->site_key('__getAllKeys')))
 		{
 			if(is_array($all_keys))
 			{
-				if($index = array_search($this->key($key), $all_keys))
+				if($index = array_search($key, $all_keys))
 				{
 					unset($all_keys[$index]);
 				}
-				$this->connection->set($this->key('__getAllKeys'), array_unique($all_keys), 0);
+				$this->connection->set($this->site_key('__getAllKeys'), array_unique($all_keys), 0);
 			}
 		}
 
-		$key = $this->key($key);
 		return $this->connection->delete($key);
 	}
 
-	public function get($key='', $group='')
+	public function get($key='')
 	{
-		$key = $this->key($key);
 		return $this->connection->get($key);
 	}
 
-	public function set($key='', $value='', $expires=0, $group='')
+	public function set($key='', $value='', $expires=0)
 	{
-		$key = $this->key($key);
 		$result = $this->connection->set($key, $value, $expires);
 
 		if($result)
 		{
-			$all_keys = $this->get('__getAllKeys');
+			$all_keys = $this->get($this->site_key('__getAllKeys'));
 
 			if(empty($all_keys))
 			{
@@ -88,25 +90,23 @@ class GRAV_CACHE_DRIVER_MEMCACHED extends GRAV_CACHE_DRIVER {
 			}
 
 			$all_keys[] = $key;
-			$this->connection->set($this->key('__getAllKeys'), array_unique($all_keys), 0);
+			$this->connection->set($this->site_key('__getAllKeys'), array_unique($all_keys), 0);
 		}
 
 		return $result;
 	}
 
-	public function increment($key='', $value=1, $group='')
+	public function increment($key='', $value=1)
 	{
-		$key = $this->key($key);
 		return $this->connection->increment($key, 1, $value);
 	}
 
-	public function decrement($key='', $value=1, $group='')
+	public function decrement($key='', $value=1)
 	{
-		$key = $this->key($key);
 		return $this->connection->decrement($key, 1, $value);
 	}
 
-	public function clear($regex='')
+	public function clear($regex='/(.*)/')
 	{
 		if($regex)
 		{
@@ -114,7 +114,6 @@ class GRAV_CACHE_DRIVER_MEMCACHED extends GRAV_CACHE_DRIVER {
 			{
 				foreach ($keys as $key)
 				{
-					$key = str_replace($this->key(), '', $key);
 					$this->delete($key);
 				}
 
@@ -128,8 +127,8 @@ class GRAV_CACHE_DRIVER_MEMCACHED extends GRAV_CACHE_DRIVER {
 	public function get_all_keys($regex='/(.*)/')
 	{
 		$all_keys = array();
-		$keys = $this->get('__getAllKeys');
-		$site_key = $this->key();
+		$keys = $this->get($this->site_key('__getAllKeys'));
+		$site_key = $this->site_key();
 
 		foreach ((array) $keys as $key)
 		{

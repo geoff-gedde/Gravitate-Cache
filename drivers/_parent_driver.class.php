@@ -10,9 +10,9 @@ class GRAV_CACHE_DRIVER {
 
 	}
 
-	public function key($key='')
+	public function site_key($key='', $group='')
 	{
-		return GRAV_CACHE::site_key($key);
+		return GRAV_CACHE::site_key($key, $group);
 	}
 
 	/**

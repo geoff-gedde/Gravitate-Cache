@@ -14,12 +14,17 @@ class GRAV_CACHE_DRIVER_REDIS extends GRAV_CACHE_DRIVER {
 	{
 		if($this->is_enabled('database') || $this->is_enabled('page') || $this->is_enabled('object'))
 		{
-			if(!empty($this->config['servers']) && ($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'memcached'))
+			if($this->config['type'] == 'auto' || $this->config['type'] == 'automemory' || $this->config['type'] == 'redis')
 			{
 				if(class_exists('Redis'))
 				{
 					if($this->connection = new Redis())
 					{
+						if(empty($this->config['servers']))
+						{
+							$this->config['servers'] = '127.0.0.1';
+						}
+
 						$added_server = false;
 
 						foreach(explode(',', $this->config['servers']) as $serverport)
@@ -31,6 +36,7 @@ class GRAV_CACHE_DRIVER_REDIS extends GRAV_CACHE_DRIVER {
 
 							if($this->connection->pconnect($server, $port))
 							{
+								$this->connection->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_PHP);
 								$added_server = true;
 							}
 						}
@@ -45,44 +51,34 @@ class GRAV_CACHE_DRIVER_REDIS extends GRAV_CACHE_DRIVER {
 
 	}
 
-	// public function key($key='')
-	// {
-	// 	$domain = (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '');
-	// 	return $domain.'::'.trim($key);
-	// }
-
 	public function flush()
 	{
 		return $this->connection->flushAll();
 	}
 
-	public function delete($key='', $group='')
+	public function delete($key='')
 	{
-		$key = $this->key($key);
 		return $this->connection->delete($key);
 	}
 
-	public function get($key='', $group='')
+	public function get($key='')
 	{
-		$key = $this->key($key);
 		return $this->connection->get($key);
 	}
 
-	public function set($key='', $value='', $expires=0, $group='')
+	public function set($key='', $value='', $expires=0)
 	{
-		$key = $this->key($key);
-		return $this->connection->set($key, $value, $expires);
+
+		return $this->connection->set($key, $value);
 	}
 
-	public function increment($key='', $value=1, $group='')
+	public function increment($key='', $value=1)
 	{
-		$key = $this->key($key);
 		return $this->connection->increment($key, 1, $value);
 	}
 
-	public function decrement($key='', $value=1, $group='')
+	public function decrement($key='', $value=1)
 	{
-		$key = $this->key($key);
 		return $this->connection->decrement($key, 1, $value);
 	}
 
@@ -108,15 +104,16 @@ class GRAV_CACHE_DRIVER_REDIS extends GRAV_CACHE_DRIVER {
 	{
 		$all_keys = array();
 
-		$keys = $this->connection->keys($regex);
-
-		$site_key = $this->key();
-
-		foreach ($keys as $key)
+		if($keys = $this->connection->keys('*'))
 		{
-			if(preg_match($regex, $key) && strpos($key, $site_key) !== false)
+			$site_key = $this->site_key();
+
+			foreach ($keys as $key)
 			{
-				$all_keys[] = $key;
+				if(preg_match($regex, $key) && strpos($key, $site_key) !== false)
+				{
+					$all_keys[] = $key;
+				}
 			}
 		}
 

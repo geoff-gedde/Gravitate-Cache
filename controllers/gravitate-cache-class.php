@@ -10,13 +10,13 @@
  */
 class GRAV_CACHE {
 
-	private static $mcache;
 	private static $no_cache_reason = '';
 	private static $static_cache = array();
 	public static $debug = false;
 	public static $settings;
+	private static $cache_enabled = false;
 	public static $driver = false;
-	public static $drivers = array('redis','memcached','memcache','disk');
+	protected static $drivers = array('memcached','memcache','redis','apcu','disk');
 
 
 
@@ -31,18 +31,24 @@ class GRAV_CACHE {
 
 		if(!empty(self::$settings))
 		{
-			include_once(dirname(dirname(__FILE__)).'/drivers/_parent_driver.class.php');
-
-			foreach (self::$drivers as $driver)
+			if(self::is_enabled('page') || self::is_enabled('object') || self::is_enabled('database'))
 			{
-				$driver_class = 'GRAV_CACHE_DRIVER_'.strtoupper($driver);
-				include_once(dirname(dirname(__FILE__)).'/drivers/'.$driver.'.class.php');
-				$driver_obj = new $driver_class(self::$settings);
-				if($driver_obj->init())
+				self::$cache_enabled = true;
+
+				include_once(dirname(dirname(__FILE__)).'/drivers/_parent_driver.class.php');
+
+				foreach (self::$drivers as $driver)
 				{
-					self::$settings['type'] = $driver;
-					self::$driver = $driver_obj;
-					break;
+					$driver_class = 'GRAV_CACHE_DRIVER_'.strtoupper($driver);
+					include_once(dirname(dirname(__FILE__)).'/drivers/'.$driver.'.class.php');
+					$driver_obj = new $driver_class(self::$settings);
+					if($driver_obj->init())
+					{
+						self::$settings['type'] = $driver;
+						self::$driver = $driver_obj;
+
+						break;
+					}
 				}
 			}
 		}
@@ -157,7 +163,7 @@ class GRAV_CACHE {
 	{
 		if(self::is_enabled('page') && self::can_page_cache())
 		{
-			$cache = self::get(self::get_page_key(), 'page');
+			$cache = self::get(self::get_page_key(), 'pg');
 			if(!empty($cache['value']))
 			{
 				echo $cache['value']."\n<!-- Gravitate Cache - Served from Page Cache on (".date('m/d/Y H:i:s', $cache['time']).") -->";
@@ -184,10 +190,19 @@ class GRAV_CACHE {
 	 *
 	 * @return string
 	 */
-	public static function site_key($key='')
+	public static function site_key($key='', $group='')
 	{
+		if($group)
+		{
+			$group.= '__';
+		}
+		else
+		{
+			$group = '';
+		}
+
 		$domain = (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '');
-		return $domain.'::'.trim($key);
+		return $domain.'__'.trim($group).trim($key);
 	}
 
 
@@ -204,7 +219,7 @@ class GRAV_CACHE {
 	public static function get_page_key($url='', $logged_in=true)
 	{
 		$url = ($url ? $url : $_SERVER['REQUEST_URI']);
-		return 'page::uid'.self::get_userid_hash($logged_in).'::'.$url;
+		return 'uid'.self::get_userid_hash($logged_in).'__'.$url;
 	}
 
 
@@ -225,43 +240,59 @@ class GRAV_CACHE {
 			$output.= "\n<!-- Gravitate Cache - MISSING CACHE FILE SETTINGS.  You may need to Re-save your settings -->";
 		}
 
-		if(!self::can_page_cache())
+		if(!self::is_enabled())
 		{
-			if(!empty(self::$no_cache_reason))
+			$output.= "\n<!-- Gravitate Cache - Caching is Not Enabled. -->";
+		}
+		else
+		{
+
+			if(!self::$driver)
 			{
-				$output.= "\n<!-- Gravitate Cache - Page Not Cached - ".self::$no_cache_reason." -->";
+				$output.= "\n<!-- Gravitate Cache - Cannot connect to Cache Driver or Cache Server -->";
 			}
-		}
-
-		if(!$is_page_cached && self::is_enabled('page') && self::can_page_cache())
-		{
-			$output.= "\n<!-- Gravitate Cache - Page Not Cached - Not Cached Yet. Try Reloading -->";
-		}
-
-		if(self::is_enabled('database') && method_exists($wpdb,'get_gravitate_cached_items'))
-		{
-			$output.= "\n<!-- Gravitate Cache - Database Cache Enabled - ".count($wpdb->get_gravitate_cached_items())." Querie(s) pulled from cache. ".count($wpdb->get_gravitate_cache_raw_items())." Raw Querie(s).  -->";
-		}
-
-		if(!self::is_enabled('database'))
-		{
-			$output.= "\n<!-- Gravitate Cache - Database Cache Disabled -->";
-		}
-
-		if(!self::is_enabled('object'))
-		{
-			$output.= "\n<!-- Gravitate Cache - Object Cache Disabled -->";
-		}
-
-		if(self::is_enabled('object'))
-		{
-			global $wp_object_cache;
-
-			if($wp_object_cache)
+			else
 			{
-				$output.= "\n<!-- Gravitate Cache - Object Cache Stats - ";
-				$output.= "Cache Hits: ".$wp_object_cache->grav_cache_hits." / ";
-				$output.= "Cache Misses: ".$wp_object_cache->grav_cache_misses." -->";
+
+				if(!self::can_page_cache())
+				{
+					if(!empty(self::$no_cache_reason))
+					{
+						$output.= "\n<!-- Gravitate Cache - Page Not Cached - ".self::$no_cache_reason." -->";
+					}
+				}
+
+				if(!$is_page_cached && self::is_enabled('page') && self::can_page_cache())
+				{
+					$output.= "\n<!-- Gravitate Cache - Page Not Cached - Not Cached Yet. Try Reloading -->";
+				}
+
+				if(self::is_enabled('database') && method_exists($wpdb,'get_gravitate_cached_items'))
+				{
+					$output.= "\n<!-- Gravitate Cache - Database Cache Enabled - ".count($wpdb->get_gravitate_cached_items())." Querie(s) pulled from cache. ".count($wpdb->get_gravitate_cache_raw_items())." Raw Querie(s).  -->";
+				}
+
+				if(!self::is_enabled('database'))
+				{
+					$output.= "\n<!-- Gravitate Cache - Database Cache Disabled -->";
+				}
+
+				if(!self::is_enabled('object'))
+				{
+					$output.= "\n<!-- Gravitate Cache - Object Cache Disabled -->";
+				}
+
+				if(self::is_enabled('object'))
+				{
+					global $wp_object_cache;
+
+					if($wp_object_cache)
+					{
+						$output.= "\n<!-- Gravitate Cache - Object Cache Stats - ";
+						$output.= "Cache Hits: ".$wp_object_cache->grav_cache_hits." / ";
+						$output.= "Cache Misses: ".$wp_object_cache->grav_cache_misses." -->";
+					}
+				}
 			}
 		}
 
@@ -269,7 +300,7 @@ class GRAV_CACHE {
 		{
 			if(!empty(self::$settings['type']))
 			{
-				$output.= "\n<!-- Gravitate Cache - DEBUG: Caching Type is (".self::$settings['type'].") -->";
+				$output.= "\n<!-- Gravitate Cache - DEBUG: Caching Driver Type is (".self::$settings['type'].") -->";
 			}
 
 			if(self::is_enabled('database') && method_exists($wpdb,'get_gravitate_cached_items'))
@@ -328,6 +359,11 @@ class GRAV_CACHE {
 	 */
 	public static function is_enabled($cache_type='', $group='enabled')
 	{
+		if(!$cache_type)
+		{
+			return self::$cache_enabled;
+		}
+
 		if(!empty(self::$settings[$group]) && in_array($cache_type, self::$settings[$group]))
 		{
 			return true;
@@ -344,6 +380,11 @@ class GRAV_CACHE {
 	 */
 	public static function can_cache()
 	{
+		if(!self::$driver)
+		{
+			self::$no_cache_reason = 'Cannot connect to Cache Driver';
+			return false;
+		}
 
 		if(defined('DOING_AJAX') && DOING_AJAX)
 		{
@@ -405,14 +446,14 @@ class GRAV_CACHE {
 	 */
 	public static function can_page_cache()
 	{
-		if(!self::can_cache())
-		{
-			return false;
-		}
-
 		if(!self::is_enabled('page'))
 		{
 			self::$no_cache_reason = 'Page Cache Disabled';
+			return false;
+		}
+
+		if(!self::can_cache())
+		{
 			return false;
 		}
 
@@ -530,7 +571,7 @@ class GRAV_CACHE {
 	 */
 	public static function clear_pages()
 	{
-		return self::clear('/page\:\:/');
+		return self::clear('/__pg__/');
 	}
 
 
@@ -540,9 +581,20 @@ class GRAV_CACHE {
 	 *
 	 *
 	 */
+	public static function clear_admin_pages()
+	{
+		return self::clear('/wp-admin/');
+	}
+
+
+	/**
+	 *
+	 *
+	 *
+	 */
 	public static function clear_db()
 	{
-		return self::clear('/db\:\:/');
+		return self::clear('/__db__/');
 	}
 
 
@@ -554,7 +606,7 @@ class GRAV_CACHE {
 	 */
 	public static function clear_object()
 	{
-		return self::clear('/object\:\:/');
+		return self::clear('/__ob__/');
 	}
 
 
@@ -618,7 +670,7 @@ class GRAV_CACHE {
 	 */
 	public static function get($key='', $group='', $passphrase='')
 	{
-		$value = '';
+		$value = null;
 
 		if(!empty($key))
 		{
@@ -627,15 +679,11 @@ class GRAV_CACHE {
 				return self::$static_cache[$key];
 			}
 
-			if(self::has_key($key))
-			{
+			// if(self::has_key($key)) // This is slow
+			// {
+				$key = self::site_key($key, $group);
 				$value = self::$driver->get($key);
-			}
-		}
-
-		if(strpos($key, 'object') !== false)
-		{
-			return $value;
+			// }
 		}
 
 		if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
@@ -665,27 +713,29 @@ class GRAV_CACHE {
 
 				$value = $new_value;
 			}
-		}
 
-		if(function_exists("base64_decode"))	// Compress Data if available to save disk space
-		{
-			$value = base64_decode($value);
-		}
-
-		if(!is_null($value))
-		{
-			if(is_string($value))
+			if(function_exists("base64_decode"))	// Compress Data if available to save disk space
 			{
-				if($value === 'N;' || preg_match('/^a:\d+:{.*?/', trim($value)) || preg_match('/^b:\d+;/', trim($value)) || preg_match('/^o:\d+:"[a-z0-9_]+":\d+:{.*?/', $value))  // If array || object
-				{
-					$new_value = unserialize($value);
-					if(is_array($new_value) || is_object($new_value) || is_bool($new_value) || is_null($new_value))
-					{
-						$value = $new_value;
-					}
-				}
+				$value = base64_decode($value);
 			}
+
+			$value = unserialize($value);
 		}
+
+		// if(!is_null($value))
+		// {
+		// 	if(is_string($value))
+		// 	{
+		// 		if($value === 'N;' || preg_match('/^a:\d+:{.*?/', trim($value)) || preg_match('/^b:\d+;/', trim($value)) || preg_match('/^o:\d+:"[a-z0-9_]+":\d+:{.*?/', $value))  // If array || object
+		// 		{
+		// 			$new_value = unserialize($value);
+		// 			if(is_array($new_value) || is_object($new_value) || is_bool($new_value) || is_null($new_value))
+		// 			{
+		// 				$value = $new_value;
+		// 			}
+		// 		}
+		// 	}
+		// }
 
 		return $value;
 	}
@@ -712,10 +762,15 @@ class GRAV_CACHE {
 
 		self::$static_cache[$key] = $value;
 
-		if(strpos($key, 'object') === false)
-		{
-			//$value = array('time' => time(), 'value' => $value);
+		$key = self::site_key($key, $group);
 
+		if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
+		{
+			$passphrase = (defined('AUTH_SALT') && !empty(AUTH_SALT) ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
+		}
+
+		if($passphrase && function_exists("base64_encode"))
+		{
 			$value = serialize($value);
 
 			if(function_exists("base64_encode"))	// Compress Data if available to save disk space
@@ -723,31 +778,23 @@ class GRAV_CACHE {
 				$value = base64_encode($value);
 			}
 
-			if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
+			if(function_exists('openssl_encrypt'))
 			{
-				$passphrase = (defined('AUTH_SALT') && !empty(AUTH_SALT) ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
+				$value = openssl_encrypt($value, 'aes128', $passphrase, 0, '1234567890193756');
 			}
-
-			if($passphrase && function_exists("base64_encode"))
+			else
 			{
-				if(function_exists('openssl_encrypt'))
-				{
-					$value = openssl_encrypt($value, 'aes128', $passphrase, 0, '1234567890193756');
-				}
-				else
-				{
-					$new_value = $value;
-					$path = array_merge(range('a', 'z'), range('A', 'Z'), range(0, 9));
-					$passphrase = str_replace(':', '', str_pad($passphrase, 62 , AUTH_KEY).implode('', $path));
-					$passphrase = array_values(array_unique(str_split($passphrase)));
+				$new_value = $value;
+				$path = array_merge(range('a', 'z'), range('A', 'Z'), range(0, 9));
+				$passphrase = str_replace(':', '', str_pad($passphrase, 62 , AUTH_KEY).implode('', $path));
+				$passphrase = array_values(array_unique(str_split($passphrase)));
 
-					foreach ($path as $str_key => $str_val)
-					{
-						$new_value = str_replace($str_val, $passphrase[$str_key].':', $new_value);
-					}
-
-					$value = $new_value;
+				foreach ($path as $str_key => $str_val)
+				{
+					$new_value = str_replace($str_val, $passphrase[$str_key].':', $new_value);
 				}
+
+				$value = $new_value;
 			}
 		}
 

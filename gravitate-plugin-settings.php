@@ -225,7 +225,7 @@ class GRAV_CACHE_PLUGIN_SETTINGS
 				.repeater-table td.handle:after {
 					top: 52%;
 				}
-				.grav-plugin-settings-type-checkbox label { display: block; }
+				.grav-plugin-settings-type-checkbox label { display: block; width: 250px; }
 			</style>
 
 			<form method="post" class="grav-plugin-settings-form">
