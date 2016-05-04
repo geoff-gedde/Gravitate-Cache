@@ -225,7 +225,8 @@ class GRAV_CACHE_PLUGIN_SETTINGS
 				.repeater-table td.handle:after {
 					top: 52%;
 				}
-				.grav-plugin-settings-type-checkbox label { display: block; width: 250px; }
+				.grav-plugin-settings-type-checkbox label,
+				.grav-plugin-settings-type-radio label { display: block; width: 250px; }
 			</style>
 
 			<form method="post" class="grav-plugin-settings-form">
@@ -358,7 +359,7 @@ class GRAV_CACHE_PLUGIN_SETTINGS
 					clone.find('input[type="text"], textarea').val('');
 					clone.find('input[type="checkbox"]').removeAttr('checked');
 					clone.find('select option').removeAttr('selected');
-					clone.find('.grav-blocks-colorpicker').wpColorPicker();
+					//clone.find('.grav-blocks-colorpicker').wpColorPicker();
 
 					clone.appendTo('.repeater-table');
 
@@ -385,7 +386,7 @@ class GRAV_CACHE_PLUGIN_SETTINGS
 				}
 
 				addRemoveListeners();
-				$('.repeater-item:not(.repeater-placeholder) .grav-blocks-colorpicker').wpColorPicker();
+				//$('.repeater-item:not(.repeater-placeholder) .grav-blocks-colorpicker').wpColorPicker();
 
 			});
 
@@ -456,9 +457,11 @@ class GRAV_CACHE_PLUGIN_SETTINGS
 			<input type="hidden" name="<?php echo $settings_attribute;?>" value="">
 			<?php
 
-			foreach($field['options'] as $option_value => $option_label)
+			foreach($field['options'] as $option_value => $option)
 			{
 				$real_value = ($option_value !== $option_label && !is_numeric($option_value) ? $option_value : $option_label);
+
+				$option_label = (isset($option['label']) ? $option['label'] : (is_string($option) ? $option : ucfirst($option_value)));
 
 				if(isset($field['value']) && is_array($field['value']))
 				{
@@ -469,7 +472,38 @@ class GRAV_CACHE_PLUGIN_SETTINGS
 					$checked = '';
 				}
 				?>
-				<label><input type="checkbox" name="<?php echo $settings_attribute;?>[]" value="<?php echo $option_value; ?>" <?php echo $checked; ?>><?php echo ucfirst($option_label); ?></label>
+				<label><input type="checkbox" name="<?php echo $settings_attribute;?>[]" value="<?php echo $real_value; ?>" <?php echo $checked; ?>><?php echo ucfirst($option_label); ?></label><?php if(!empty($option['description'])){ ?><small><?php echo $option['description']; ?></small><br><?php } ?><br>
+				<?php
+			}
+		}
+		else if(!empty($field['type']) && $field['type'] == 'radio')
+		{
+			if(is_string($field['options']))
+			{
+				$field['options'] = explode(',', $field['options']);
+				$field['options'] = array_combine($field['options'], $field['options']);
+			}
+
+			?>
+			<input type="hidden" name="<?php echo $settings_attribute;?>" value="">
+			<?php
+
+			foreach($field['options'] as $option_value => $option)
+			{
+				$real_value = ($option_value !== $option_label && !is_numeric($option_value) ? $option_value : $option_label);
+
+				$option_label = (isset($option['label']) ? $option['label'] : (is_string($option) ? $option : ucfirst($option_value)));
+
+				if(isset($field['value']) && is_array($field['value']))
+				{
+					$checked = (in_array($real_value, $field['value'])) ? 'checked' : '';
+				}
+				else
+				{
+					$checked = '';
+				}
+				?>
+				<label><input type="radio" name="<?php echo $settings_attribute;?>[]" value="<?php echo $real_value; ?>" <?php echo $checked; ?>><?php echo ucfirst($option_label); ?></label><?php if(!empty($option['description'])){ ?><small><?php echo $option['description']; ?></small><br><?php } ?><br>
 				<?php
 			}
 		}

@@ -665,7 +665,7 @@ class GRAV_CACHE_INIT {
 
 	static function wp_head()
 	{
-		if(is_user_logged_in())
+		if(is_user_logged_in() && !empty($_GET['page']) && $_GET['page'] === 'gravitate_cache_settings')
 		{
 			?>
 
@@ -700,6 +700,31 @@ class GRAV_CACHE_INIT {
 							}
 						});
 					}
+
+					jQuery('.grav-plugin-settings-configuration label input').on('click', function(e)
+					{
+						switch(jQuery(this).val())
+						{
+							case 'autodetect':
+							case 'disable':
+							default:
+								jQuery('.grav-plugin-settings-form .form-table tbody tr').hide();
+								jQuery('.grav-plugin-settings-configuration').show();
+							break;
+							case 'custom':
+								jQuery('.grav-plugin-settings-form .form-table tbody tr').show();
+							break;
+						}
+					});
+
+					<?php
+
+					$this_settings = (!empty($_POST['settings']) ? $_POST['settings'] : self::$settings);
+
+					if(!empty($this_settings['configuration'][0]) && ($this_settings['configuration'][0] === 'autodetect' || $this_settings['configuration'][0] === 'disable')){ ?>
+						jQuery('.grav-plugin-settings-form .form-table tbody tr').hide();
+						jQuery('.grav-plugin-settings-configuration').show();
+					<?php } ?>
 				});
 
 				function grav_pre_load_logged_in_page(url)
@@ -778,6 +803,7 @@ class GRAV_CACHE_INIT {
 					<?php
 				}
 				?>
+
 
 			</script>
 
@@ -884,11 +910,17 @@ class GRAV_CACHE_INIT {
 
 			case 'general':
 
+				$configuration = array(
+					'disable' => array('label' => 'Disable All Cache', 'description' => 'This disables all Cache.'),
+					'autodetect' => array('label' => 'Auto Detect the Best Settings', 'description' => 'This will Auto Detect the best settings for you based on your server setup.'),
+					'custom' => array('label' => 'Custom (Advanced)', 'description' => 'This will allow you to manually configure the settings.  For advanced users.')
+				);
+
 				$enables = array(
-					'page' => 'Page Cache',
-					'database' => 'Database Cache',
-					'object' => 'Object Cache',
-					'browser' => 'Browser Cache (For Apache Only)'
+					'page' => array('label' => 'Page Cache', 'description' => 'This method is the fastest caching method, but may cause issues with dynamic content.  For that reason it is best to use AJAX to pull in dynamic content or use the "Page Caching - Excluded Urls" below to specify which URLs should not use Page Caching.'),
+					'database' => array('label' => 'Database Cache', 'description' => 'This is useful if your database is on a separate server or network then your web server. Otherwise, this could slow down the load time.'),
+					'object' => array('label' => 'Object Cache', 'description' => 'This is useful if your webserver has a slow CPU or on an older PHP version or not using Opcache.  Check your with your Webmaster to see if this is useful.'),
+					'browser' => array('label' => 'Browser Cache', 'description' => 'For Apache Only - This will not work if your using Nginx only.')
 				);
 
 				$types = array(
@@ -912,6 +944,8 @@ class GRAV_CACHE_INIT {
 					'exclude_wp_logged_in' => 'Logged In - Don\'t use Caching while logged in.'
 				);
 
+				$fields['configuration'] = array('type' => 'radio', 'label' => 'Configuration', 'options' => $configuration);
+
 				$fields['enabled'] = array('type' => 'checkbox', 'label' => 'Enable', 'options' => $enables, 'description' => 'Check each Cache you wish to Enable');
 				$fields['type'] = array('type' => 'select', 'label' => 'Caching Type', 'options' => $types, 'description' => 'Determine which cache Driver to use.');
 				$fields['servers'] = array('type' => 'text', 'label' => 'In Memory Servers', 'description' => 'IP and Port.  Ex 127.0.0.1:11211 (Comma Seperated for Multiple Servers)');
@@ -926,6 +960,56 @@ class GRAV_CACHE_INIT {
 		}
 
 		return $fields;
+	}
+
+
+
+	/**
+	 * Detects the best settings to use based on the server and setup.
+	 *
+	 * @return array
+	 */
+	public static function auto_detect_settings()
+	{
+		$settings = array();
+
+		$settings['configuration'] = array('autodetect');
+
+		$settings['enabled'] = array('page');
+
+		if(DB_HOST !== 'localhost' && DB_HOST !== '127.0.0.1')
+		{
+			$settings['enabled'][] = 'database';
+		}
+
+		if(!function_exists('opcache_get_configuration') || !ini_get('opcache.enable') || version_compare(PHP_VERSION, '5.5.0', '<'))
+		{
+			$settings['enabled'][] = 'object';
+		}
+
+		$settings['enabled'][] = 'browser';
+
+
+        $settings['type'] = 'auto';
+
+        $settings['servers'] = '127.0.0.1';
+
+        if(class_exists('Memcached') || class_exists('Memcache') || class_exists('Redis') || (function_exists('apcu_add') && class_exists('APCUIterator')))
+        {
+        	$settings['encryption'] = '';
+        }
+        else
+        {
+        	$settings['encryption'] = array('encrypt');
+        }
+
+        $settings['excludes'] = '';
+
+        $settings['excluded_urls'] = '';
+
+        $settings['preload_urls'] = 'menus';
+
+        return $settings;
 	}
 
 	/**
@@ -960,6 +1044,19 @@ class GRAV_CACHE_INIT {
 
 		if(empty($error))
 		{
+			if(!empty($_POST['save_grav_settings']) && !empty($_POST['settings']['configuration'][0]))
+			{
+				switch ($_POST['settings']['configuration'][0])
+				{
+					case 'autodetect':
+						$_POST['settings'] = self::auto_detect_settings();
+						break;
+
+					case 'disable':
+						$_POST['settings'] = array('configuration' => array('disable'), 'enabled' => '', 'encryption' => '', 'excludes' => '', 'excluded_urls' => '');
+						break;
+				}
+			}
 			// Save Settings if POST
 			$response = GRAV_CACHE_PLUGIN_SETTINGS::save_settings();
 
@@ -986,12 +1083,14 @@ class GRAV_CACHE_INIT {
 
 		?>
 			<div class="wrap">
-			<h2>Gravitate Cache Settings BETA</h2>
-			<h4 style="margin: 6px 0;">Version <?php echo self::$version;?></h4>
+				<h2>Gravitate Cache Settings BETA</h2>
+				<h4 style="margin: 6px 0;">Version <?php echo self::$version;?></h4>
 
-			<br>
-			This Plugin is still in Beta
-			<br>
+				<br>
+				<div class="error">
+					<p>WARNING: This plugin is still in BETA and should not be used in Production.  For now please submit all issues to the WordPress Support Page for this Plugin.</p>
+				</div>
+				<br>
 
 		<?php
 
