@@ -17,7 +17,8 @@ if ( !function_exists( 'add_action' ) ) {
 register_activation_hook(__FILE__, array( 'GRAV_CACHE_INIT', 'activate'));
 register_deactivation_hook(__FILE__, array( 'GRAV_CACHE_INIT', 'deactivate'));
 add_action('admin_menu', array( 'GRAV_CACHE_INIT', 'admin_menu'));
-add_action('updated_option', array( 'GRAV_CACHE_INIT', 'updated_option'));
+add_action('network_admin_menu', array( 'GRAV_CACHE_INIT', 'admin_menu'));
+//add_action('updated_option', array( 'GRAV_CACHE_INIT', 'updated_option'));
 add_action('admin_bar_menu', array( 'GRAV_CACHE_INIT', 'admin_bar_menu'), 999);
 add_action('init', array( 'GRAV_CACHE_INIT', 'start_cache'));
 
@@ -51,7 +52,7 @@ add_action('save_post', array( 'GRAV_CACHE_INIT', 'update_post' ));
 // add_action('profile_update', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
 // add_action('user_register', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
 // add_action('delete_user', array( 'GRAV_CACHE_INIT', 'clear_and_load' ));
-add_action('updated_option', array( 'GRAV_CACHE_INIT', 'updated_option' ));
+//add_action('updated_option', array( 'GRAV_CACHE_INIT', 'updated_option' ));
 
 add_action( 'plugins_loaded', array('GRAV_CACHE_INIT', 'clear_plugins_cache') );
 add_action( 'upgrader_process_complete', array('GRAV_CACHE_INIT', 'clear_and_load'), 10, 0 );
@@ -139,10 +140,17 @@ class GRAV_CACHE_INIT {
 
 	private static function add_wp_cache()
 	{
-		if(defined('WP_CONTENT_DIR'))
+		if(defined('ABSPATH'))
 		{
 			// Add WP_CACHE
 			$config_file = ABSPATH.'wp-config.php';
+			$config_file_private = dirname(ABSPATH).'/wp-config.php';
+
+			if(!file_exists($config_file) && file_exists($config_file_private))
+			{
+				$config_file = $config_file_private;
+			}
+
 			if((!defined('WP_CACHE') || !WP_CACHE) && file_exists($config_file))
 			{
 				$config_data = file_get_contents($config_file);
@@ -184,26 +192,36 @@ class GRAV_CACHE_INIT {
 
 	private static function remove_wp_cache()
 	{
-		$config_file = ABSPATH.'wp-config.php';
-		if(defined('WP_CACHE') && WP_CACHE && file_exists($config_file))
+		if(defined('ABSPATH'))
 		{
-			$config_data = file_get_contents($config_file);
+			$config_file = ABSPATH.'wp-config.php';
+			$config_file_private = dirname(ABSPATH).'/wp-config.php';
 
-			if($config_data && strpos($config_data, "WP_CACHE"))
+			if(!file_exists($config_file) && file_exists($config_file_private))
 			{
-				$wp_cache_list = array(
-					"define('WP_CACHE', true);",
-					"define('WP_CACHE',true);",
-					"define('WP_CACHE', TRUE);",
-					"define('WP_CACHE',TRUE);",
-					'define("WP_CACHE", true);',
-					'define("WP_CACHE",true);',
-					'define("WP_CACHE", TRUE);',
-					'define("WP_CACHE",TRUE);'
-					);
+				$config_file = $config_file_private;
+			}
 
-				$config_data = str_replace($wp_cache_list, '', $config_data);
-				file_put_contents($config_file, $config_data);
+			if(defined('WP_CACHE') && WP_CACHE && file_exists($config_file))
+			{
+				$config_data = file_get_contents($config_file);
+
+				if($config_data && strpos($config_data, "WP_CACHE"))
+				{
+					$wp_cache_list = array(
+						"define('WP_CACHE', true);",
+						"define('WP_CACHE',true);",
+						"define('WP_CACHE', TRUE);",
+						"define('WP_CACHE',TRUE);",
+						'define("WP_CACHE", true);',
+						'define("WP_CACHE",true);',
+						'define("WP_CACHE", TRUE);',
+						'define("WP_CACHE",TRUE);'
+						);
+
+					$config_data = str_replace($wp_cache_list, '', $config_data);
+					file_put_contents($config_file, $config_data);
+				}
 			}
 		}
 	}
@@ -569,23 +587,23 @@ class GRAV_CACHE_INIT {
 
 			if(!empty(self::$settings['excluded_urls']))
 			{
-				foreach (array_map('trim', explode(',', self::$settings['excluded_urls'])) as $url)
+				foreach (array_map('trim', explode("\n", self::$settings['excluded_urls'])) as $url)
 				{
 					if(!empty($url))
 					{
-						if(substr($url, 0, 1) == '/')
+						if(substr($url, 0, 1) === '/')
 						{
-							$url = '\\'.$url;
+							$url = "\\".$url;
 						}
 
-						if(substr($url, -1) == '/')
+						if(substr($url, -1) === '/')
 						{
-							$url = substr($url, 0, -1).'\\/';
+							$url = substr($url, 0, -1)."\\/";
 						}
 
-						if(substr($url, -2) == '/$')
+						if(substr($url, -2) === '/$')
 						{
-							$url = substr($url, 0, -2).'\\/$';
+							$url = substr($url, 0, -2)."\\/$";
 						}
 
 						if(preg_match('/'.$url.'/', $page_url))
@@ -665,7 +683,7 @@ class GRAV_CACHE_INIT {
 
 	static function wp_head()
 	{
-		if(is_user_logged_in() && !empty($_GET['page']) && $_GET['page'] === 'gravitate_cache_settings')
+		if(is_user_logged_in())
 		{
 			?>
 
@@ -861,7 +879,19 @@ class GRAV_CACHE_INIT {
 
 	static function admin_menu()
 	{
-		add_submenu_page( 'options-general.php', 'Grav Cache Settings', 'Grav Cache Settings', 'manage_options', 'gravitate_cache_settings', array( __CLASS__, 'settings' ));
+		$parent_item = 'options-general.php';
+
+		if ( ! function_exists( 'is_plugin_active_for_network' ) )
+		{
+		    require_once( ABSPATH . '/wp-admin/includes/plugin.php' );
+		}
+
+		if(is_plugin_active_for_network( basename(dirname(__FILE__)).'/'.basename(__FILE__) ))
+		{
+			$parent_item = 'settings.php';
+		}
+
+		add_submenu_page( $parent_item, 'Gravitate Cache', 'Gravitate Cache', 'manage_options', 'gravitate_cache_settings', array( __CLASS__, 'settings' ));
 	}
 
 	static function admin_bar_menu( $wp_admin_bar )

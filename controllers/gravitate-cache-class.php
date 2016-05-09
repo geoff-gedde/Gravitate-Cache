@@ -141,14 +141,33 @@ class GRAV_CACHE {
 	{
 		if(defined('COOKIEHASH') && COOKIEHASH)
 		{
-			$cookiehash = COOKIEHASH;
+			return (!empty($_COOKIE['wordpress_logged_in_'.COOKIEHASH]) ? $_COOKIE['wordpress_logged_in_'.COOKIEHASH] : '');
 		}
 		else
 		{
-			$cookiehash = md5('http'.(!empty($_SERVER['HTTPS']) ? 's' : '').'://'.$_SERVER['HTTP_HOST']);
+			$keys = array();
+
+			if(defined('WP_SITEURL'))
+			{
+				$keys[] = WP_SITEURL;
+				$keys[] = WP_SITEURL.'/';
+			}
+			$keys[] = 'https://'.$_SERVER['HTTP_HOST'];
+			$keys[] = 'http://'.$_SERVER['HTTP_HOST'];
+			$keys[] = 'https://'.$_SERVER['HTTP_HOST'].'/';
+			$keys[] = 'http://'.$_SERVER['HTTP_HOST'].'/';
+
+			foreach($keys as $key)
+			{
+				$cookiehash = 'wordpress_logged_in_'.md5($key);
+				if(!empty($_COOKIE[$cookiehash]))
+				{
+					return $_COOKIE[$cookiehash];
+				}
+			}
 		}
 
-		return (!empty($_COOKIE['wordpress_logged_in_'.$cookiehash]) ? $_COOKIE['wordpress_logged_in_'.$cookiehash] : '');
+		return '';
 	}
 
 
@@ -486,8 +505,10 @@ class GRAV_CACHE {
 		$excluded_urls = array();
 		if(!empty(self::$settings['excluded_urls']))
 		{
-			$excluded_urls = array_map('trim', explode(',', self::$settings['excluded_urls']));
+			$excluded_urls = array_map('trim', explode("\n", self::$settings['excluded_urls']));
 		}
+
+
 
 		$excluded_urls[] = 'gravitate_cache_settings';
 
@@ -497,19 +518,19 @@ class GRAV_CACHE {
 			{
 				$original_url = $url;
 
-				if(substr($url, 0, 1) == '/')
+				if(substr($url, 0, 1) === '/')
 				{
-					$url = '\\'.$url;
+					$url = "\\".$url;
 				}
 
-				if(substr($url, -1) == '/')
+				if(substr($url, -1) === '/')
 				{
-					$url = substr($url, 0, -1).'\\/';
+					$url = substr($url, 0, -1)."\\/";
 				}
 
-				if(substr($url, -2) == '/$')
+				if(substr($url, -2) === '/$')
 				{
-					$url = substr($url, 0, -2).'\\/$';
+					$url = substr($url, 0, -2)."\\/$";
 				}
 
 				if(preg_match('/'.$url.'/', $_SERVER['REQUEST_URI']))
