@@ -709,7 +709,7 @@ class GRAV_CACHE {
 
 		if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
 		{
-			$passphrase = (defined('AUTH_SALT') && !empty(AUTH_SALT) ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
+			$passphrase = (defined('AUTH_SALT') && AUTH_SALT ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
 		}
 
 		if($passphrase && function_exists("base64_decode"))
@@ -787,7 +787,7 @@ class GRAV_CACHE {
 
 		if(!$passphrase && self::is_enabled('encrypt', 'encryption'))
 		{
-			$passphrase = (defined('AUTH_SALT') && !empty(AUTH_SALT) ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
+			$passphrase = (defined('AUTH_SALT') && AUTH_SALT ? AUTH_SALT.'salted' : 'P6jRncM6dqbDXpEA4LwCfnCc3PvNbLF2D6');
 		}
 
 		if($passphrase && function_exists("base64_encode"))
